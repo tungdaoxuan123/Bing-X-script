@@ -1,9 +1,11 @@
-name: BingX Portfolio Tracker (Every 10 min)
+name: BingX Portfolio Tracker with Perplexity Analysis (Every 60 min)
+
 
 on:
   schedule:
-    - cron: '*/60 * * * *'  # Run every 10 minutes
+    - cron: '*/60 * * * *'
   workflow_dispatch:  # Allow manual trigger
+
 
 jobs:
   track-portfolio:
@@ -22,7 +24,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Create google credentials file
+    - name: Create Google credentials file
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: |
@@ -43,16 +45,40 @@ jobs:
             json.dump(api_data, f)
         EOF
     
-    - name: Run BingX tracker
+    - name: Create Perplexity API key file
+      env:
+        PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+      run: |
+        python3 << 'EOF'
+        import json
+        perplexity_data = {
+            "api_key": "${{ secrets.PERPLEXITY_API_KEY }}"
+        }
+        with open('perplexity_key.json', 'w') as f:
+            json.dump(perplexity_data, f)
+        EOF
+    
+    - name: Run BingX tracker with Perplexity analysis
       env:
         GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
         BINGX_API_KEY: ${{ secrets.BINGX_API_KEY }}
         BINGX_API_SECRET: ${{ secrets.BINGX_API_SECRET }}
+        PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: |
-        python3 bingx_to_sheets.py
+        python3 tracker_full.py
+    
+    - name: Clean up sensitive files
+      if: always()
+      run: |
+        rm -f api_key.json perplexity_key.json google_credentials.json
     
     - name: Notify on failure
       if: failure()
       run: |
-        echo "❌ BingX tracker failed - check logs above"
+        echo "❌ BingX tracker with Perplexity analysis failed - check logs above"
+    
+    - name: Notify on success
+      if: success()
+      run: |
+        echo "✅ BingX tracker with Perplexity analysis completed successfully"
