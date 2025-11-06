@@ -11,40 +11,32 @@ sys.modules['ccxt'] = ccxt_module
 
 from bingx.ccxt import bingx as BingxSync
 
+
 def load_api_keys():
-    """Load API keys from file or environment variables"""
-    # Try environment variables first (for GitHub Actions)
+    """Load API keys from environment or file"""
     api_key = os.getenv('BINGX_API_KEY')
     api_secret = os.getenv('BINGX_API_SECRET')
     
     if api_key and api_secret:
+        print("✓ API keys loaded from environment")
         return api_key, api_secret
     
-    # Fall back to local file
     try:
         with open("api_key.json", "r") as f:
             data = json.load(f)
+        if "api_key" not in data or "api_secret" not in data:
+            raise Exception("JSON file must contain 'api_key' and 'api_secret'")
+        print("✓ API keys loaded from file")
         return data["api_key"], data["api_secret"]
     except FileNotFoundError:
-        raise Exception("API keys not found in environment or api_key.json file")
+        raise Exception("API keys not found in environment or api_key.json")
 
-def load_google_credentials():
-    """Load Google credentials from file or environment variable"""
-    # Try environment variable first (for GitHub Actions)
-    creds_json = os.getenv('GOOGLE_CREDENTIALS')
-    
-    if creds_json:
-        # Write to temporary file
-        with open("google_credentials.json", "w") as f:
-            f.write(creds_json)
-    
-    # Check if file exists
-    if not os.path.exists("google_credentials.json"):
-        raise Exception("Google credentials not found")
 
-def get_positions_data(api_key, api_secret):
-    """Fetch all positions from BingX"""
+def get_positions(api_key, api_secret):
+    """Get your own trading positions"""
     try:
+        print("Fetching positions...")
+        
         client = BingxSync({
             'apiKey': api_key,
             'secret': api_secret,
@@ -55,43 +47,70 @@ def get_positions_data(api_key, api_secret):
         })
         
         positions = client.fetch_positions()
-        print(f"✓ Fetched {len(positions)} positions from BingX")
+        active = [p for p in positions if p.get('contracts', 0) > 0]
+        print(f"✓ Found {len(active)} active position(s)")
+        
         return positions
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
 
-def send_to_google_sheets(positions, sheet_id):
-    """Send position data to Google Sheets"""
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+def load_google_credentials():
+    """Load Google credentials from environment or file"""
+    creds_json = os.getenv('GOOGLE_CREDENTIALS')
     
+    if creds_json:
+        with open("google_credentials.json", "w") as f:
+            f.write(creds_json)
+        print("✓ Google credentials loaded from environment")
+        return
+    
+    if not os.path.exists("google_credentials.json"):
+        raise Exception("Google credentials not found in environment or file")
+    
+    print("✓ Google credentials loaded from file")
+
+
+def ensure_sheet_exists(service, sheet_id, sheet_name):
+    """Ensure sheet exists"""
     try:
-        # Load credentials
-        load_google_credentials()
+        props = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         
-        # Authenticate
-        creds = Credentials.from_service_account_file(
-            'google_credentials.json', 
-            scopes=SCOPES
-        )
+        for sheet in props.get('sheets', []):
+            if sheet['properties']['title'] == sheet_name:
+                return True
         
-        service = build('sheets', 'v4', credentials=creds)
+        # Create sheet
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body={'requests': [{
+                'addSheet': {
+                    'properties': {
+                        'title': sheet_name,
+                        'gridProperties': {'rowCount': 1000, 'columnCount': 15}
+                    }
+                }
+            }]}
+        ).execute()
         
-        # Get current timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return True
+    except Exception as e:
+        raise
+
+
+def write_positions(service, sheet_id, positions, timestamp):
+    """Write positions to sheet"""
+    try:
+        sheet_name = "Positions"
+        ensure_sheet_exists(service, sheet_id, sheet_name)
         
-        # Check if sheet exists and has data
-        try:
-            result = service.spreadsheets().values().get(
-                spreadsheetId=sheet_id,
-                range='Positions!A1'
-            ).execute()
-            current_values = result.get('values', [])
-        except Exception as e:
-            print(f"⚠️  Sheet might not exist: {e}")
-            current_values = []
+        # Clear sheet
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:O1000'
+        ).execute()
         
-        # Prepare header row (only once)
         headers = [
             "Timestamp", "Symbol", "Side", "Entry Price", "Mark Price", 
             "Contracts", "Notional", "Unrealized P&L", "Realized P&L", 
@@ -99,90 +118,98 @@ def send_to_google_sheets(positions, sheet_id):
             "Initial Margin", "P&L %"
         ]
         
-        # Prepare data rows
-        rows = []
-        if not current_values:
-            rows.append(headers)
+        rows = [headers]
+        count = 0
         
-        position_count = 0
-        for position in positions:
-            if position.get('contracts') and position.get('contracts') > 0:  # Only active positions
-                unrealized = float(position.get('unrealizedPnl', 0))
-                realized = float(position.get('realizedPnl', 0))
+        for pos in positions:
+            if pos.get('contracts', 0) > 0:
+                unrealized = float(pos.get('unrealizedPnl', 0))
+                realized = float(pos.get('realizedPnl', 0))
                 total_pnl = unrealized + realized
-                notional = float(position.get('notional', 0))
-                pnl_percent = (total_pnl / notional * 100) if notional > 0 else 0
+                notional = float(pos.get('notional', 0))
+                pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
                 
-                row = [
+                rows.append([
                     timestamp,
-                    position.get('symbol', ''),
-                    position.get('side', ''),
-                    round(float(position.get('entryPrice', 0)), 8),
-                    round(float(position.get('markPrice', 0)), 8),
-                    round(float(position.get('contracts', 0)), 8),
+                    pos.get('symbol', ''),
+                    pos.get('side', ''),
+                    round(float(pos.get('entryPrice', 0)), 8),
+                    round(float(pos.get('markPrice', 0)), 8),
+                    round(float(pos.get('contracts', 0)), 8),
                     round(notional, 4),
                     round(unrealized, 8),
                     round(realized, 8),
                     round(total_pnl, 8),
-                    position.get('leverage', ''),
-                    position.get('marginMode', ''),
-                    position.get('liquidationPrice', ''),
-                    round(float(position.get('initialMargin', 0)), 4),
-                    round(pnl_percent, 2)
-                ]
-                rows.append(row)
-                position_count += 1
+                    pos.get('leverage', ''),
+                    pos.get('marginMode', ''),
+                    pos.get('liquidationPrice', ''),
+                    round(float(pos.get('initialMargin', 0)), 4),
+                    round(pnl_pct, 2)
+                ])
+                count += 1
         
-        if position_count == 0:
-            print("⚠️  No active positions to log")
-            return
+        if count == 0:
+            rows = [headers]
         
-        # Append to sheet
-        body = {
-            'values': rows
-        }
-        
-        append_range = f"Positions!A{len(current_values) + 1}" if current_values else "Positions!A1"
-        
-        result = service.spreadsheets().values().append(
+        service.spreadsheets().values().update(
             spreadsheetId=sheet_id,
-            range=append_range,
+            range=f'{sheet_name}!A1',
             valueInputOption='RAW',
-            body=body
+            body={'values': rows}
         ).execute()
         
-        updated_rows = result.get('updates', {}).get('updatedRows', 0)
-        print(f"✅ Successfully logged {position_count} position(s) to Google Sheets")
+        print(f"✅ Wrote {count} position(s) to Google Sheets")
         
     except Exception as e:
-        print(f"❌ Error sending to Google Sheets: {e}")
+        print(f"❌ Error writing to sheet: {e}")
         raise
+
 
 if __name__ == "__main__":
     try:
+        print("=" * 80)
+        print("BingX Portfolio Tracker")
+        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 80)
+        print()
+        
         # Get Sheet ID from environment or use default
         SHEET_ID = os.getenv('GOOGLE_SHEET_ID', '1NADCWY48TpJU4jBrw0Bow1TEGxHBBwsTxwEstHDQPyU')
         
-        print("=" * 50)
-        print("BingX Portfolio Tracker")
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 50)
-        
         # Load API keys
-        key, secret = load_api_keys()
-        print("✓ API keys loaded")
+        api_key, api_secret = load_api_keys()
         
         # Get positions
-        positions = get_positions_data(key, secret)
+        positions = get_positions(api_key, api_secret)
         
-        if positions:
-            # Send to Google Sheets
-            send_to_google_sheets(positions, SHEET_ID)
-            print("=" * 50)
-            print("✅ Tracker run completed successfully")
-        else:
-            print("❌ No positions found or error fetching data")
+        if not positions:
+            print("No positions data")
+            sys.exit(1)
+        
+        # Load Google credentials
+        load_google_credentials()
+        
+        # Write to Google Sheets
+        creds = Credentials.from_service_account_file(
+            'google_credentials.json',
+            scopes=[
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+        )
+        
+        service = build('sheets', 'v4', credentials=creds)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        write_positions(service, SHEET_ID, positions, timestamp)
+        
+        print()
+        print("=" * 80)
+        print("✅ Tracker completed successfully")
+        print("=" * 80)
         
     except Exception as e:
         print(f"❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
