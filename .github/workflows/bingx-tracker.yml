@@ -2,7 +2,7 @@ name: BingX Portfolio Tracker (Every 10 min)
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Run every 10 minutes
+    - cron: '*/60 * * * *'  # Run every 10 minutes
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
