@@ -311,6 +311,7 @@ Based on my open positions and the current market for Bitcoin (BTC), Amazon (AMZ
    - Exit prices for current positions if needed
 
 Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making.
+MOST IMPORTANT: real time data price 
 
 CRITICAL FORMATTING REQUIREMENTS FOR RESPONSE:
 1. Use markdown tables with pipe delimiters (|)
