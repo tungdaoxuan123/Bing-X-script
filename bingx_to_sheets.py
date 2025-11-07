@@ -310,7 +310,32 @@ Based on my open positions and the current market for Bitcoin (BTC), Amazon (AMZ
    - New entry points for uncovered assets
    - Exit prices for current positions if needed
 
-Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making."""
+Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making.
+
+CRITICAL FORMATTING REQUIREMENTS FOR RESPONSE:
+1. Use markdown tables with pipe delimiters (|)
+2. Include table headers with dashes (---)
+3. Each data row must be a complete table row
+4. One asset/position per row in tables
+5. Format: | Column1 | Column2 | Column3 | ... |
+6. Use section headers (##) to separate analysis areas
+7. Provide specific numbers, not ranges or estimates
+8. Include units (%, $, etc.) in values
+9. Make tables copy-paste ready for Google Sheets
+10. Keep analysis rows aligned with table columns
+
+RESEARCH REQUIREMENTS:
+1. Search for latest market sentiment and technical analysis
+2. Find recent news catalysts affecting each asset
+3. Analyze funding rates and leverage trends
+4. Check correlation between assets
+5. Research upcoming events/earnings/economic data
+6. Compare current prices vs historical support/resistance
+7. Analyze volume patterns and order book dynamics
+8. Identify institutional positioning if available
+9. Research regulatory updates affecting these assets
+10. Provide multiple trading scenarios with probabilities
+"""
     
     return prompt
 
