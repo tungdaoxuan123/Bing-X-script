@@ -324,18 +324,6 @@ CRITICAL FORMATTING REQUIREMENTS FOR RESPONSE:
 8. Include units (%, $, etc.) in values
 9. Make tables copy-paste ready for Google Sheets
 10. Keep analysis rows aligned with table columns
-
-RESEARCH REQUIREMENTS:
-1. Search for latest market sentiment and technical analysis
-2. Find recent news catalysts affecting each asset
-3. Analyze funding rates and leverage trends
-4. Check correlation between assets
-5. Research upcoming events/earnings/economic data
-6. Compare current prices vs historical support/resistance
-7. Analyze volume patterns and order book dynamics
-8. Identify institutional positioning if available
-9. Research regulatory updates affecting these assets
-10. Provide multiple trading scenarios with probabilities
 """
     
     return prompt
