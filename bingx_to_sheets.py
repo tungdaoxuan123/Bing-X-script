@@ -6,14 +6,11 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 import requests
 
-
 # Map ccxt module
 import bingx.ccxt as ccxt_module
 sys.modules['ccxt'] = ccxt_module
 
-
 from bingx.ccxt import bingx as BingxSync
-
 
 
 def load_api_keys():
@@ -56,7 +53,7 @@ def load_perplexity_api_key():
 
 
 def get_positions(api_key, api_secret):
-    """Get your own trading positions"""
+    """Get all trading positions"""
     try:
         print("Fetching positions...")
         
@@ -71,7 +68,7 @@ def get_positions(api_key, api_secret):
         
         positions = client.fetch_positions()
         active = [p for p in positions if p.get('contracts', 0) > 0]
-        print(f"✓ Found {len(active)} active position(s)")
+        print(f"✓ Found {len(positions)} total position(s), {len(active)} active")
         
         return positions
     except Exception as e:
@@ -79,45 +76,131 @@ def get_positions(api_key, api_secret):
         return []
 
 
-def format_positions_for_analysis(positions):
-    """Format positions into a readable summary for Perplexity analysis"""
-    active_positions = [p for p in positions if p.get('contracts', 0) > 0]
+def get_all_position_fields(position):
+    """Extract ALL available fields from a position object"""
+    fields = {
+        'Basic Info': {
+            'symbol': position.get('symbol'),
+            'side': position.get('side'),
+            'positionMode': position.get('positionMode'),
+            'marginMode': position.get('marginMode'),
+            'marginType': position.get('marginType'),
+        },
+        'Pricing': {
+            'entryPrice': position.get('entryPrice'),
+            'markPrice': position.get('markPrice'),
+            'liquidationPrice': position.get('liquidationPrice'),
+            'estLiquidationPrice': position.get('estLiquidationPrice'),
+        },
+        'Position Size': {
+            'contracts': position.get('contracts'),
+            'contractSize': position.get('contractSize'),
+            'percentage': position.get('percentage'),
+            'notional': position.get('notional'),
+            'collateral': position.get('collateral'),
+        },
+        'P&L': {
+            'unrealizedPnl': position.get('unrealizedPnl'),
+            'realizedPnl': position.get('realizedPnl'),
+        },
+        'Leverage & Margin': {
+            'leverage': position.get('leverage'),
+            'initialMargin': position.get('initialMargin'),
+            'maintMargin': position.get('maintMargin'),
+            'marginRequired': position.get('marginRequired'),
+            'marginAvailable': position.get('marginAvailable'),
+            'marginRatio': position.get('marginRatio'),
+            'mmratio': position.get('mmratio'),
+        },
+        'Funding': {
+            'fundingRate': position.get('fundingRate'),
+            'fundingFee': position.get('fundingFee'),
+            'nextFundingTime': position.get('nextFundingTime'),
+        },
+        'Timestamps': {
+            'timestamp': position.get('timestamp'),
+            'datetime': position.get('datetime'),
+        }
+    }
+    return fields
+
+
+def print_all_positions_detailed(positions):
+    """Print detailed information for ALL positions"""
+    if not positions:
+        print("No positions found")
+        return
     
-    if not active_positions:
-        return "No active positions"
+    print(f"\n{'='*100}")
+    print(f"DETAILED POSITION INFORMATION - Total: {len(positions)} positions")
+    print(f"{'='*100}")
     
-    summary = "## Current Trading Positions Summary:\n\n"
-    
-    for pos in active_positions:
-        unrealized = float(pos.get('unrealizedPnl', 0))
-        realized = float(pos.get('realizedPnl', 0))
-        total_pnl = unrealized + realized
-        notional = float(pos.get('notional', 0))
-        pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
+    for idx, pos in enumerate(positions, 1):
+        contracts = float(pos.get('contracts', 0))
+        status = "ACTIVE" if contracts > 0 else "CLOSED"
         
-        summary += f"""
-**{pos.get('symbol', 'N/A')} ({pos.get('side', 'UNKNOWN')})**
-- Entry Price: {pos.get('entryPrice', 'N/A')}
-- Mark Price: {pos.get('markPrice', 'N/A')}
-- Contracts: {pos.get('contracts', 0)}
-- Notional Value: ${notional:.2f}
-- Unrealized P&L: ${unrealized:.2f}
-- Realized P&L: ${realized:.2f}
-- Total P&L: ${total_pnl:.2f} ({pnl_pct:.2f}%)
-- Leverage: {pos.get('leverage', 'N/A')}
-- Liquidation Price: {pos.get('liquidationPrice', 'N/A')}
-- Initial Margin: ${pos.get('initialMargin', 0):.2f}
+        print(f"\n[Position {idx}] {pos.get('symbol', 'UNKNOWN')} - {status}")
+        print("-" * 100)
+        
+        # Get all available fields
+        all_fields = get_all_position_fields(pos)
+        
+        for category, fields_dict in all_fields.items():
+            has_values = any(v is not None for v in fields_dict.values())
+            if has_values:
+                print(f"\n  {category}:")
+                for field_name, value in fields_dict.items():
+                    if value is not None:
+                        print(f"    {field_name}: {value}")
+
+
+def format_all_positions_for_analysis(positions):
+    """Format ALL positions (active and inactive) for Perplexity analysis"""
+    if not positions:
+        return "No positions available"
+    
+    summary = "## All Trading Positions Summary:\n\n"
+    
+    # Group by active and inactive
+    active = [p for p in positions if float(p.get('contracts', 0)) > 0]
+    inactive = [p for p in positions if float(p.get('contracts', 0)) == 0]
+    
+    if active:
+        summary += "### ACTIVE POSITIONS:\n\n"
+        for pos in active:
+            unrealized = float(pos.get('unrealizedPnl', 0))
+            realized = float(pos.get('realizedPnl', 0))
+            total_pnl = unrealized + realized
+            notional = float(pos.get('notional', 0))
+            pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
+            
+            summary += f"""**{pos.get('symbol')} ({pos.get('side')})**
+- Entry: {pos.get('entryPrice')} | Mark: {pos.get('markPrice')} | Liquidation: {pos.get('liquidationPrice')}
+- Size: {pos.get('contracts')} contracts | Notional: ${notional:.2f}
+- P&L: ${total_pnl:.2f} ({pnl_pct:.2f}%) | Unrealized: ${unrealized:.2f} | Realized: ${realized:.2f}
+- Leverage: {pos.get('leverage')}x | Margin: ${pos.get('initialMargin', 0):.2f} | Mode: {pos.get('marginMode')}
+- Funding Rate: {pos.get('fundingRate')}
+- Margin Ratio: {pos.get('marginRatio')}
+
 """
+    else:
+        summary += "### No active positions\n\n"
+    
+    if inactive:
+        summary += f"\n### CLOSED POSITIONS: ({len(inactive)} position(s))\n\n"
+        for pos in inactive:
+            realized = float(pos.get('realizedPnl', 0))
+            summary += f"- **{pos.get('symbol')}**: Realized P&L: ${realized:.2f}\n"
     
     return summary
 
 
 def send_to_perplexity_for_analysis(positions, perplexity_api_key):
-    """Send position data to Perplexity API for analysis"""
+    """Send all position data to Perplexity API for analysis"""
     try:
         print("\nSending positions to Perplexity for analysis...")
         
-        positions_summary = format_positions_for_analysis(positions)
+        positions_summary = format_all_positions_for_analysis(positions)
         
         prompt = f"""I'm a cryptocurrency trader using BingX. I need your analysis of my current trading positions.
 
@@ -182,7 +265,6 @@ def load_google_credentials():
     print("✓ Google credentials loaded from file")
 
 
-
 def ensure_sheet_exists(service, sheet_id, sheet_name):
     """Ensure sheet exists"""
     try:
@@ -199,7 +281,7 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
                 'addSheet': {
                     'properties': {
                         'title': sheet_name,
-                        'gridProperties': {'rowCount': 1000, 'columnCount': 15}
+                        'gridProperties': {'rowCount': 1000, 'columnCount': 20}
                     }
                 }
             }]}
@@ -210,58 +292,67 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
         raise
 
 
-
-def write_positions(service, sheet_id, positions, timestamp):
-    """Write positions to sheet"""
+def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
+    """Write ALL positions (including closed ones) to Google Sheets"""
     try:
-        sheet_name = "Positions"
+        sheet_name = "All Positions"
         ensure_sheet_exists(service, sheet_id, sheet_name)
         
-        # Clear sheet
-        service.spreadsheets().values().clear(
-            spreadsheetId=sheet_id,
-            range=f'{sheet_name}!A1:O1000'
-        ).execute()
-        
+        # Extended headers
         headers = [
-            "Timestamp", "Symbol", "Side", "Entry Price", "Mark Price", 
-            "Contracts", "Notional", "Unrealized P&L", "Realized P&L", 
-            "Total P&L", "Leverage", "Margin Mode", "Liquidation Price", 
-            "Initial Margin", "P&L %"
+            "Timestamp", "Symbol", "Side", "Status", "Entry Price", "Mark Price", 
+            "Contracts", "Notional Value", "Unrealized P&L", "Realized P&L", 
+            "Total P&L", "P&L %", "Leverage", "Margin Mode", "Initial Margin",
+            "Liquidation Price", "Funding Rate", "Margin Ratio", "Percentage"
         ]
         
         rows = [headers]
-        count = 0
+        active_count = 0
+        closed_count = 0
         
+        # Loop through ALL positions
         for pos in positions:
-            if pos.get('contracts', 0) > 0:
-                unrealized = float(pos.get('unrealizedPnl', 0))
-                realized = float(pos.get('realizedPnl', 0))
-                total_pnl = unrealized + realized
-                notional = float(pos.get('notional', 0))
-                pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
-                
-                rows.append([
-                    timestamp,
-                    pos.get('symbol', ''),
-                    pos.get('side', ''),
-                    round(float(pos.get('entryPrice', 0)), 8),
-                    round(float(pos.get('markPrice', 0)), 8),
-                    round(float(pos.get('contracts', 0)), 8),
-                    round(notional, 4),
-                    round(unrealized, 8),
-                    round(realized, 8),
-                    round(total_pnl, 8),
-                    pos.get('leverage', ''),
-                    pos.get('marginMode', ''),
-                    pos.get('liquidationPrice', ''),
-                    round(float(pos.get('initialMargin', 0)), 4),
-                    round(pnl_pct, 2)
-                ])
-                count += 1
+            contracts = float(pos.get('contracts', 0))
+            status = "ACTIVE" if contracts > 0 else "CLOSED"
+            
+            if status == "ACTIVE":
+                active_count += 1
+            else:
+                closed_count += 1
+            
+            unrealized = float(pos.get('unrealizedPnl', 0))
+            realized = float(pos.get('realizedPnl', 0))
+            total_pnl = unrealized + realized
+            notional = float(pos.get('notional', 0))
+            pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
+            
+            rows.append([
+                timestamp,
+                pos.get('symbol', ''),
+                pos.get('side', ''),
+                status,
+                round(float(pos.get('entryPrice', 0)), 8),
+                round(float(pos.get('markPrice', 0)), 8),
+                round(contracts, 8),
+                round(notional, 4),
+                round(unrealized, 8),
+                round(realized, 8),
+                round(total_pnl, 8),
+                round(pnl_pct, 2),
+                pos.get('leverage', ''),
+                pos.get('marginMode', ''),
+                round(float(pos.get('initialMargin', 0)), 4),
+                pos.get('liquidationPrice', ''),
+                pos.get('fundingRate', ''),
+                round(float(pos.get('marginRatio', 0)), 4),
+                round(float(pos.get('percentage', 0)), 2)
+            ])
         
-        if count == 0:
-            rows = [headers]
+        # Clear and update sheet
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:S1000'
+        ).execute()
         
         service.spreadsheets().values().update(
             spreadsheetId=sheet_id,
@@ -270,7 +361,7 @@ def write_positions(service, sheet_id, positions, timestamp):
             body={'values': rows}
         ).execute()
         
-        print(f"✅ Wrote {count} position(s) to 'Positions' sheet")
+        print(f"✅ Wrote {active_count} active + {closed_count} closed position(s) to sheet")
         
     except Exception as e:
         print(f"❌ Error writing to sheet: {e}")
@@ -295,11 +386,16 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
         
         for para in paragraphs:
             if para.strip():
-                # Wrap long text
                 lines = para.split('\n')
                 for line in lines:
                     if line.strip():
                         rows.append([line.strip()])
+        
+        # Clear and update sheet
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:B1000'
+        ).execute()
         
         service.spreadsheets().values().update(
             spreadsheetId=sheet_id,
@@ -315,13 +411,12 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
         raise
 
 
-
 if __name__ == "__main__":
     try:
-        print("=" * 80)
-        print("BingX Portfolio Tracker with Perplexity Analysis")
+        print("=" * 100)
+        print("BingX Portfolio Tracker with Perplexity Analysis (ALL POSITIONS)")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 80)
+        print("=" * 100)
         print()
         
         # Get Sheet ID from environment or use default
@@ -331,12 +426,15 @@ if __name__ == "__main__":
         api_key, api_secret = load_api_keys()
         perplexity_api_key = load_perplexity_api_key()
         
-        # Get positions
+        # Get all positions
         positions = get_positions(api_key, api_secret)
         
         if not positions:
             print("No positions data")
             sys.exit(1)
+        
+        # Print detailed position information
+        print_all_positions_detailed(positions)
         
         # Load Google credentials
         load_google_credentials()
@@ -353,8 +451,8 @@ if __name__ == "__main__":
         service = build('sheets', 'v4', credentials=creds)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Write positions to sheet
-        write_positions(service, SHEET_ID, positions, timestamp)
+        # Write all positions to sheet
+        write_all_positions_to_sheet(service, SHEET_ID, positions, timestamp)
         
         # Send positions to Perplexity for analysis
         analysis = send_to_perplexity_for_analysis(positions, perplexity_api_key)
@@ -363,9 +461,9 @@ if __name__ == "__main__":
         write_analysis_to_sheet(service, SHEET_ID, analysis, timestamp)
         
         print()
-        print("=" * 80)
+        print("=" * 100)
         print("✅ Tracker completed successfully")
-        print("=" * 80)
+        print("=" * 100)
         
     except Exception as e:
         print(f"❌ Fatal error: {e}")
