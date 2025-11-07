@@ -52,6 +52,22 @@ def load_perplexity_api_key():
         raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
+def safe_float(value, default=0.0):
+    """Safely convert value to float with default fallback"""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_round(value, decimals=8, default=0.0):
+    """Safely round a value"""
+    num = safe_float(value, default)
+    return round(num, decimals)
+
+
 def get_positions(api_key, api_secret):
     """Get all trading positions"""
     try:
@@ -67,7 +83,7 @@ def get_positions(api_key, api_secret):
         })
         
         positions = client.fetch_positions()
-        active = [p for p in positions if p.get('contracts', 0) > 0]
+        active = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
         print(f"✓ Found {len(positions)} total position(s), {len(active)} active")
         
         return positions
@@ -136,7 +152,7 @@ def print_all_positions_detailed(positions):
     print(f"{'='*100}")
     
     for idx, pos in enumerate(positions, 1):
-        contracts = float(pos.get('contracts', 0))
+        contracts = safe_float(pos.get('contracts', 0))
         status = "ACTIVE" if contracts > 0 else "CLOSED"
         
         print(f"\n[Position {idx}] {pos.get('symbol', 'UNKNOWN')} - {status}")
@@ -162,23 +178,23 @@ def format_all_positions_for_analysis(positions):
     summary = "## All Trading Positions Summary:\n\n"
     
     # Group by active and inactive
-    active = [p for p in positions if float(p.get('contracts', 0)) > 0]
-    inactive = [p for p in positions if float(p.get('contracts', 0)) == 0]
+    active = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
+    inactive = [p for p in positions if safe_float(p.get('contracts', 0)) == 0]
     
     if active:
         summary += "### ACTIVE POSITIONS:\n\n"
         for pos in active:
-            unrealized = float(pos.get('unrealizedPnl', 0))
-            realized = float(pos.get('realizedPnl', 0))
+            unrealized = safe_float(pos.get('unrealizedPnl', 0))
+            realized = safe_float(pos.get('realizedPnl', 0))
             total_pnl = unrealized + realized
-            notional = float(pos.get('notional', 0))
+            notional = safe_float(pos.get('notional', 0))
             pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
             
             summary += f"""**{pos.get('symbol')} ({pos.get('side')})**
 - Entry: {pos.get('entryPrice')} | Mark: {pos.get('markPrice')} | Liquidation: {pos.get('liquidationPrice')}
 - Size: {pos.get('contracts')} contracts | Notional: ${notional:.2f}
 - P&L: ${total_pnl:.2f} ({pnl_pct:.2f}%) | Unrealized: ${unrealized:.2f} | Realized: ${realized:.2f}
-- Leverage: {pos.get('leverage')}x | Margin: ${pos.get('initialMargin', 0):.2f} | Mode: {pos.get('marginMode')}
+- Leverage: {pos.get('leverage')}x | Margin: ${safe_float(pos.get('initialMargin', 0)):.2f} | Mode: {pos.get('marginMode')}
 - Funding Rate: {pos.get('fundingRate')}
 - Margin Ratio: {pos.get('marginRatio')}
 
@@ -189,7 +205,7 @@ def format_all_positions_for_analysis(positions):
     if inactive:
         summary += f"\n### CLOSED POSITIONS: ({len(inactive)} position(s))\n\n"
         for pos in inactive:
-            realized = float(pos.get('realizedPnl', 0))
+            realized = safe_float(pos.get('realizedPnl', 0))
             summary += f"- **{pos.get('symbol')}**: Realized P&L: ${realized:.2f}\n"
     
     return summary
@@ -293,7 +309,7 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
 
 
 def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
-    """Write ALL positions (including closed ones) to Google Sheets"""
+    """Write ALL positions (including closed ones) to Google Sheets with safe value handling"""
     try:
         sheet_name = "All Positions"
         ensure_sheet_exists(service, sheet_id, sheet_name)
@@ -310,9 +326,9 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         active_count = 0
         closed_count = 0
         
-        # Loop through ALL positions
+        # Loop through ALL positions with safe value handling
         for pos in positions:
-            contracts = float(pos.get('contracts', 0))
+            contracts = safe_float(pos.get('contracts', 0))
             status = "ACTIVE" if contracts > 0 else "CLOSED"
             
             if status == "ACTIVE":
@@ -320,32 +336,38 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
             else:
                 closed_count += 1
             
-            unrealized = float(pos.get('unrealizedPnl', 0))
-            realized = float(pos.get('realizedPnl', 0))
+            unrealized = safe_float(pos.get('unrealizedPnl', 0))
+            realized = safe_float(pos.get('realizedPnl', 0))
             total_pnl = unrealized + realized
-            notional = float(pos.get('notional', 0))
+            notional = safe_float(pos.get('notional', 0))
             pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
+            entry_price = safe_float(pos.get('entryPrice', 0))
+            mark_price = safe_float(pos.get('markPrice', 0))
+            liquidation_price = safe_float(pos.get('liquidationPrice', 0))
+            initial_margin = safe_float(pos.get('initialMargin', 0))
+            margin_ratio = safe_float(pos.get('marginRatio', 0))
+            percentage = safe_float(pos.get('percentage', 0))
             
             rows.append([
                 timestamp,
                 pos.get('symbol', ''),
                 pos.get('side', ''),
                 status,
-                round(float(pos.get('entryPrice', 0)), 8),
-                round(float(pos.get('markPrice', 0)), 8),
-                round(contracts, 8),
-                round(notional, 4),
-                round(unrealized, 8),
-                round(realized, 8),
-                round(total_pnl, 8),
-                round(pnl_pct, 2),
+                safe_round(entry_price, 8),
+                safe_round(mark_price, 8),
+                safe_round(contracts, 8),
+                safe_round(notional, 4),
+                safe_round(unrealized, 8),
+                safe_round(realized, 8),
+                safe_round(total_pnl, 8),
+                safe_round(pnl_pct, 2),
                 pos.get('leverage', ''),
                 pos.get('marginMode', ''),
-                round(float(pos.get('initialMargin', 0)), 4),
-                pos.get('liquidationPrice', ''),
+                safe_round(initial_margin, 4),
+                safe_round(liquidation_price, 2),
                 pos.get('fundingRate', ''),
-                round(float(pos.get('marginRatio', 0)), 4),
-                round(float(pos.get('percentage', 0)), 2)
+                safe_round(margin_ratio, 4),
+                safe_round(percentage, 2)
             ])
         
         # Clear and update sheet
@@ -365,6 +387,8 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         
     except Exception as e:
         print(f"❌ Error writing to sheet: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
@@ -408,6 +432,8 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
         
     except Exception as e:
         print(f"❌ Error writing analysis to sheet: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
