@@ -153,7 +153,7 @@ def get_all_position_fields(position):
 def print_all_positions_detailed(positions):
     """Print detailed information for ALL positions"""
     if not positions:
-        print("No positions found")
+        print("\n⚠️  No positions found - will still generate trading recommendations")
         return
     
     print(f"\n{'='*100}")
@@ -183,7 +183,14 @@ def print_all_positions_detailed(positions):
 def format_all_positions_for_analysis(positions):
     """Format ALL positions (active and inactive) for Perplexity analysis"""
     if not positions:
-        return "No positions available"
+        return """## Trading Portfolio Status:
+No open positions currently.
+
+Please analyze the following assets for potential entry opportunities:
+- Bitcoin (BTC)
+- Amazon (AMZN) 
+- Google (GOOGL)
+- Tesla (TSLA)"""
     
     summary = "## All Trading Positions Summary:\n\n"
     
@@ -254,9 +261,15 @@ You are a professional short-term trader focusing on quick profits. Analyze the 
    - Position sizing recommendations
    - Market volatility assessment
 
+4. **Trading Orders to Place:**
+   - Specific buy/sell orders with exact prices
+   - Recommended entry points with quantities
+   - Stop-loss and take-profit prices
+   - Order types (limit, market, etc.)
+
 Present in a concise table for fast decision-making. Prioritize actionable, timely, high-probability setups for rapid gains.
 
-⚠️ NOTE: Currently NO open positions. These recommendations are for potential NEW entries."""
+⚠️ NOTE: Currently NO open positions. These recommendations are for potential NEW entries to execute immediately."""
     else:
         # With open positions - generate prompt considering current holdings
         prompt = f"""I'm a cryptocurrency trader using BingX. I need comprehensive analysis for my portfolio.
@@ -292,6 +305,11 @@ Based on my open positions and the current market for Bitcoin (BTC), Amazon (AMZ
    - Volatility assessment for each asset
    - Time-sensitive catalysts or news
 
+5. **TRADING ORDERS TO PLACE:**
+   - Specific orders for position adjustments
+   - New entry points for uncovered assets
+   - Exit prices for current positions if needed
+
 Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making."""
     
     return prompt
@@ -301,7 +319,7 @@ Focus on short-term trends and actionable recommendations. Present in a concise 
 def print_ai_prompt_section(positions):
     """Print the AI prompt that should be sent to an AI model"""
     print("\n" + "=" * 100)
-    print("AI TRADING PROMPT FOR QUICK PROFIT ANALYSIS")
+    print("AI TRADING PROMPT FOR DEEP RESEARCH & QUICK PROFIT ANALYSIS")
     print("=" * 100)
     print()
     
@@ -314,8 +332,8 @@ def print_ai_prompt_section(positions):
     print("""
 1. Copy the prompt above
 2. Send it to your AI model (ChatGPT, Claude, Perplexity, etc.)
-3. The AI will analyze current positions (if any) and recommend buy/sell actions
-4. The prompt automatically handles both cases: with and without open positions
+3. The AI will analyze positions (if any) and recommend buy/sell actions
+4. The prompt automatically generates trading recommendations even with NO positions
 """)
 
 
@@ -402,49 +420,55 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         active_count = 0
         closed_count = 0
         
-        # Loop through ALL positions with safe value handling
-        for pos in positions:
-            contracts = safe_float(pos.get('contracts', 0))
-            status = "ACTIVE" if contracts > 0 else "CLOSED"
+        if not positions:
+            rows.append([timestamp, "NO POSITIONS", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"])
+            print(f"✅ No positions to write - recorded in sheet")
+        else:
+            # Loop through ALL positions with safe value handling
+            for pos in positions:
+                contracts = safe_float(pos.get('contracts', 0))
+                status = "ACTIVE" if contracts > 0 else "CLOSED"
+                
+                if status == "ACTIVE":
+                    active_count += 1
+                else:
+                    closed_count += 1
+                
+                unrealized = safe_float(pos.get('unrealizedPnl', 0))
+                realized = safe_float(pos.get('realizedPnl', 0))
+                total_pnl = unrealized + realized
+                notional = safe_float(pos.get('notional', 0))
+                pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
+                entry_price = safe_float(pos.get('entryPrice', 0))
+                mark_price = safe_float(pos.get('markPrice', 0))
+                liquidation_price = safe_float(pos.get('liquidationPrice', 0))
+                initial_margin = safe_float(pos.get('initialMargin', 0))
+                margin_ratio = safe_float(pos.get('marginRatio', 0))
+                percentage = safe_float(pos.get('percentage', 0))
+                
+                rows.append([
+                    timestamp,
+                    pos.get('symbol', ''),
+                    pos.get('side', ''),
+                    status,
+                    safe_round(entry_price, 8),
+                    safe_round(mark_price, 8),
+                    safe_round(contracts, 8),
+                    safe_round(notional, 4),
+                    safe_round(unrealized, 8),
+                    safe_round(realized, 8),
+                    safe_round(total_pnl, 8),
+                    safe_round(pnl_pct, 2),
+                    pos.get('leverage', ''),
+                    pos.get('marginMode', ''),
+                    safe_round(initial_margin, 4),
+                    safe_round(liquidation_price, 2),
+                    pos.get('fundingRate', ''),
+                    safe_round(margin_ratio, 4),
+                    safe_round(percentage, 2)
+                ])
             
-            if status == "ACTIVE":
-                active_count += 1
-            else:
-                closed_count += 1
-            
-            unrealized = safe_float(pos.get('unrealizedPnl', 0))
-            realized = safe_float(pos.get('realizedPnl', 0))
-            total_pnl = unrealized + realized
-            notional = safe_float(pos.get('notional', 0))
-            pnl_pct = (total_pnl / notional * 100) if notional > 0 else 0
-            entry_price = safe_float(pos.get('entryPrice', 0))
-            mark_price = safe_float(pos.get('markPrice', 0))
-            liquidation_price = safe_float(pos.get('liquidationPrice', 0))
-            initial_margin = safe_float(pos.get('initialMargin', 0))
-            margin_ratio = safe_float(pos.get('marginRatio', 0))
-            percentage = safe_float(pos.get('percentage', 0))
-            
-            rows.append([
-                timestamp,
-                pos.get('symbol', ''),
-                pos.get('side', ''),
-                status,
-                safe_round(entry_price, 8),
-                safe_round(mark_price, 8),
-                safe_round(contracts, 8),
-                safe_round(notional, 4),
-                safe_round(unrealized, 8),
-                safe_round(realized, 8),
-                safe_round(total_pnl, 8),
-                safe_round(pnl_pct, 2),
-                pos.get('leverage', ''),
-                pos.get('marginMode', ''),
-                safe_round(initial_margin, 4),
-                safe_round(liquidation_price, 2),
-                pos.get('fundingRate', ''),
-                safe_round(margin_ratio, 4),
-                safe_round(percentage, 2)
-            ])
+            print(f"✅ Wrote {active_count} active + {closed_count} closed position(s) to sheet")
         
         # Clear and update sheet
         service.spreadsheets().values().clear(
@@ -458,8 +482,6 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
             valueInputOption='RAW',
             body={'values': rows}
         ).execute()
-        
-        print(f"✅ Wrote {active_count} active + {closed_count} closed position(s) to sheet")
         
     except Exception as e:
         print(f"❌ Error writing to sheet: {e}")
@@ -516,36 +538,59 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
 
 
 def send_to_perplexity_for_analysis(positions, perplexity_api_key):
-    """Send all position data to Perplexity API for analysis"""
+    """Send all position data to Perplexity API for DEEP research analysis"""
     try:
-        print("\nSending positions to Perplexity for analysis...")
+        print("\nSending to Perplexity (Deep Research Mode) for analysis...")
         
         prompt = generate_ai_trading_prompt(positions)
         
+        # Enhanced prompt for deep research
+        deep_research_prompt = f"""{prompt}
+
+RESEARCH REQUIREMENTS FOR DEEP ANALYSIS:
+1. Search for latest market sentiment and technical analysis
+2. Find recent news catalysts affecting each asset
+3. Analyze funding rates and leverage trends
+4. Check correlation between assets
+5. Research upcoming events/earnings/economic data
+6. Compare current prices vs historical support/resistance
+7. Analyze volume patterns and order book dynamics
+8. Identify institutional positioning if available
+9. Research regulatory updates affecting these assets
+10. Provide multiple trading scenarios with probabilities
+
+Be thorough and cite all sources. Include specific data points, percentages, and timeframes.
+Provide actionable trading orders ready to execute immediately."""
+
         headers = {
             "Authorization": f"Bearer {perplexity_api_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "model": "sonar",
+            "model": "sonar",  # Research mode
             "messages": [
-                {"role": "user", "content": prompt}
-            ]
+                {"role": "user", "content": deep_research_prompt}
+            ],
+            "temperature": 0.5,
+            "top_p": 0.9,
+            "max_tokens": 4000,
+            "top_k": 3,
+            "search_recency_filter": "month"
         }
         
         response = requests.post(
             "https://api.perplexity.ai/chat/completions",
             headers=headers,
             json=payload,
-            timeout=120
+            timeout=180
         )
         
         response.raise_for_status()
         result = response.json()
         
         analysis = result['choices'][0]['message']['content']
-        print("✓ Received analysis from Perplexity")
+        print("✓ Received deep research analysis from Perplexity")
         
         return analysis
     except requests.exceptions.RequestException as e:
@@ -560,7 +605,7 @@ def send_to_perplexity_for_analysis(positions, perplexity_api_key):
 if __name__ == "__main__":
     try:
         print("=" * 100)
-        print("BingX Portfolio Tracker with Perplexity Analysis (ALL POSITIONS)")
+        print("BingX Portfolio Tracker with Perplexity Deep Research Analysis")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 100)
         print()
@@ -575,14 +620,10 @@ if __name__ == "__main__":
         # Get all positions
         positions = get_positions(api_key, api_secret)
         
-        if not positions:
-            print("No positions data")
-            sys.exit(1)
-        
-        # Print detailed position information
+        # Continue even if no positions
         print_all_positions_detailed(positions)
         
-        # Generate and print AI trading prompt
+        # Generate and print AI trading prompt (works with or without positions)
         print_ai_prompt_section(positions)
         
         # Save AI prompt to file
@@ -603,7 +644,7 @@ if __name__ == "__main__":
         service = build('sheets', 'v4', credentials=creds)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Write all positions to sheet
+        # Write positions to sheet (even if empty)
         write_all_positions_to_sheet(service, SHEET_ID, positions, timestamp)
         
         # Send positions to Perplexity for analysis
@@ -616,6 +657,9 @@ if __name__ == "__main__":
         print("=" * 100)
         print("✅ Tracker completed successfully")
         print("=" * 100)
+        print("\n📁 Generated files:")
+        print("   - ai_trading_prompt.txt (Trading recommendations)")
+        print("   - Google Sheet updated with analysis")
         
     except Exception as e:
         print(f"❌ Fatal error: {e}")
