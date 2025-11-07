@@ -6,11 +6,14 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 import requests
 
+
 # Map ccxt module
 import bingx.ccxt as ccxt_module
 sys.modules['ccxt'] = ccxt_module
 
+
 from bingx.ccxt import bingx as BingxSync
+
 
 
 def load_api_keys():
@@ -33,6 +36,7 @@ def load_api_keys():
         raise Exception("API keys not found in environment or api_key.json")
 
 
+
 def load_perplexity_api_key():
     """Load Perplexity API key from environment or file"""
     api_key = os.getenv('PERPLEXITY_API_KEY')
@@ -52,6 +56,7 @@ def load_perplexity_api_key():
         raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
+
 def safe_float(value, default=0.0):
     """Safely convert value to float with default fallback"""
     if value is None:
@@ -62,10 +67,12 @@ def safe_float(value, default=0.0):
         return default
 
 
+
 def safe_round(value, decimals=8, default=0.0):
     """Safely round a value"""
     num = safe_float(value, default)
     return round(num, decimals)
+
 
 
 def get_positions(api_key, api_secret):
@@ -90,6 +97,7 @@ def get_positions(api_key, api_secret):
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
+
 
 
 def get_all_position_fields(position):
@@ -141,6 +149,7 @@ def get_all_position_fields(position):
     return fields
 
 
+
 def print_all_positions_detailed(positions):
     """Print detailed information for ALL positions"""
     if not positions:
@@ -168,6 +177,7 @@ def print_all_positions_detailed(positions):
                 for field_name, value in fields_dict.items():
                     if value is not None:
                         print(f"    {field_name}: {value}")
+
 
 
 def format_all_positions_for_analysis(positions):
@@ -198,6 +208,7 @@ def format_all_positions_for_analysis(positions):
 - Funding Rate: {pos.get('fundingRate')}
 - Margin Ratio: {pos.get('marginRatio')}
 
+
 """
     else:
         summary += "### No active positions\n\n"
@@ -211,58 +222,121 @@ def format_all_positions_for_analysis(positions):
     return summary
 
 
-def send_to_perplexity_for_analysis(positions, perplexity_api_key):
-    """Send all position data to Perplexity API for analysis"""
-    try:
-        print("\nSending positions to Perplexity for analysis...")
-        
-        positions_summary = format_all_positions_for_analysis(positions)
-        
-        prompt = f"""I'm a cryptocurrency trader using BingX. I need your analysis of my current trading positions.
+
+def generate_ai_trading_prompt(positions):
+    """Generate AI trading analysis prompt based on current positions"""
+    
+    active_positions = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
+    
+    positions_summary = format_all_positions_for_analysis(positions)
+    
+    if not active_positions:
+        # No open positions - generate prompt for new trading opportunities
+        prompt = f"""I'm a cryptocurrency trader using BingX. I need analysis for quick profit trading.
 
 {positions_summary}
 
-Please provide:
-1. Overall portfolio health assessment
-2. Risk analysis for each position
-3. Any concerning patterns or risks I should be aware of
-4. Recommendations for position management
-5. Any suggestions for improving my trading strategy based on these positions
+You are a professional short-term trader focusing on quick profits. Analyze the latest market data for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA) with emphasis on:
 
-Be concise and actionable."""
+1. **Immediate Entry Signals:**
+   - Buy or sell signals suitable for quick entry and exit
+   - Key support/resistance levels for scalping/swing trades
+   - Entry and exit prices with tight stop-loss levels
+   - Brief explanation of short-term trends, volatility, catalysts
+
+2. **Profit Targets:**
+   - Potential quick profit targets (1-5% gains)
+   - Risk-to-reward ratio for each setup
+   - Volume spike analysis and momentum indicators (RSI, MACD, Stochastic Oscillator)
+
+3. **Risk Management:**
+   - Highlight any rapid trading risks
+   - Position sizing recommendations
+   - Market volatility assessment
+
+Present in a concise table for fast decision-making. Prioritize actionable, timely, high-probability setups for rapid gains.
+
+⚠️ NOTE: Currently NO open positions. These recommendations are for potential NEW entries."""
+    else:
+        # With open positions - generate prompt considering current holdings
+        prompt = f"""I'm a cryptocurrency trader using BingX. I need comprehensive analysis for my portfolio.
+
+{positions_summary}
+
+Based on my open positions and the current market for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA), provide:
+
+1. **CURRENT POSITION ANALYSIS:**
+   - For each open position: Should I hold, add to, or exit?
+   - Current risk/reward assessment
+   - Stop-loss and take-profit recommendations
+   - Unrealized P&L interpretation and next moves
+
+2. **NEW TRADING OPPORTUNITIES:**
+   - Immediate buy or sell signals for assets without positions
+   - Key support/resistance levels
+   - Entry and exit prices with tight stop-loss levels
+   - Estimate quick profit targets (1-5% gains)
+   - Momentum indicators (RSI, MACD, Stochastic) analysis
+
+3. **PORTFOLIO RISK MANAGEMENT:**
+   - Overall portfolio health assessment
+   - Leverage and margin ratio evaluation
+   - Funding rate impact on profitability
+   - Position balance recommendations
+   - Overall market risks and catalysts
+   - Diversification suggestions
+
+4. **QUICK PROFIT STRATEGY:**
+   - Short-term trading opportunities (scalping/swing)
+   - Volume spike analysis
+   - Volatility assessment for each asset
+   - Time-sensitive catalysts or news
+
+Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making."""
+    
+    return prompt
+
+
+
+def print_ai_prompt_section(positions):
+    """Print the AI prompt that should be sent to an AI model"""
+    print("\n" + "=" * 100)
+    print("AI TRADING PROMPT FOR QUICK PROFIT ANALYSIS")
+    print("=" * 100)
+    print()
+    
+    prompt = generate_ai_trading_prompt(positions)
+    print(prompt)
+    
+    print("\n" + "=" * 100)
+    print("USAGE INSTRUCTIONS:")
+    print("=" * 100)
+    print("""
+1. Copy the prompt above
+2. Send it to your AI model (ChatGPT, Claude, Perplexity, etc.)
+3. The AI will analyze current positions (if any) and recommend buy/sell actions
+4. The prompt automatically handles both cases: with and without open positions
+""")
+
+
+
+def save_ai_prompt_to_file(positions, filename="ai_trading_prompt.txt"):
+    """Save the AI prompt to a text file"""
+    try:
+        prompt = generate_ai_trading_prompt(positions)
         
-        headers = {
-            "Authorization": f"Bearer {perplexity_api_key}",
-            "Content-Type": "application/json"
-        }
+        with open(filename, "w") as f:
+            f.write("AI TRADING PROMPT FOR QUICK PROFIT ANALYSIS\n")
+            f.write("=" * 100 + "\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 100 + "\n\n")
+            f.write(prompt)
         
-        payload = {
-            "model": "sonar-pro",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ]
-        }
+        print(f"\n✅ AI prompt saved to: {filename}")
         
-        response = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        
-        response.raise_for_status()
-        result = response.json()
-        
-        analysis = result['choices'][0]['message']['content']
-        print("✓ Received analysis from Perplexity")
-        
-        return analysis
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error communicating with Perplexity: {e}")
-        return "Error: Could not retrieve analysis from Perplexity"
     except Exception as e:
-        print(f"❌ Error processing Perplexity response: {e}")
-        return f"Error: {str(e)}"
+        print(f"❌ Error saving AI prompt: {e}")
+
 
 
 def load_google_credentials():
@@ -279,6 +353,7 @@ def load_google_credentials():
         raise Exception("Google credentials not found in environment or file")
     
     print("✓ Google credentials loaded from file")
+
 
 
 def ensure_sheet_exists(service, sheet_id, sheet_name):
@@ -306,6 +381,7 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
         return True
     except Exception as e:
         raise
+
 
 
 def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
@@ -392,6 +468,7 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         raise
 
 
+
 def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
     """Write Perplexity analysis to Google Sheet"""
     try:
@@ -437,6 +514,49 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
         raise
 
 
+
+def send_to_perplexity_for_analysis(positions, perplexity_api_key):
+    """Send all position data to Perplexity API for analysis"""
+    try:
+        print("\nSending positions to Perplexity for analysis...")
+        
+        prompt = generate_ai_trading_prompt(positions)
+        
+        headers = {
+            "Authorization": f"Bearer {perplexity_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "sonar",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        }
+        
+        response = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120
+        )
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        analysis = result['choices'][0]['message']['content']
+        print("✓ Received analysis from Perplexity")
+        
+        return analysis
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error communicating with Perplexity: {e}")
+        return "Error: Could not retrieve analysis from Perplexity"
+    except Exception as e:
+        print(f"❌ Error processing Perplexity response: {e}")
+        return f"Error: {str(e)}"
+
+
+
 if __name__ == "__main__":
     try:
         print("=" * 100)
@@ -461,6 +581,12 @@ if __name__ == "__main__":
         
         # Print detailed position information
         print_all_positions_detailed(positions)
+        
+        # Generate and print AI trading prompt
+        print_ai_prompt_section(positions)
+        
+        # Save AI prompt to file
+        save_ai_prompt_to_file(positions)
         
         # Load Google credentials
         load_google_credentials()
