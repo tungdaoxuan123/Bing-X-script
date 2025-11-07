@@ -167,7 +167,6 @@ def print_all_positions_detailed(positions):
         print(f"\n[Position {idx}] {pos.get('symbol', 'UNKNOWN')} - {status}")
         print("-" * 100)
         
-        # Get all available fields
         all_fields = get_all_position_fields(pos)
         
         for category, fields_dict in all_fields.items():
@@ -183,18 +182,10 @@ def print_all_positions_detailed(positions):
 def format_all_positions_for_analysis(positions):
     """Format ALL positions (active and inactive) for Perplexity analysis"""
     if not positions:
-        return """## Trading Portfolio Status:
-No open positions currently.
-
-Please analyze the following assets for potential entry opportunities:
-- Bitcoin (BTC)
-- Amazon (AMZN) 
-- Google (GOOGL)
-- Tesla (TSLA)"""
+        return """No open positions currently."""
     
-    summary = "## All Trading Positions Summary:\n\n"
+    summary = ""
     
-    # Group by active and inactive
     active = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
     inactive = [p for p in positions if safe_float(p.get('contracts', 0)) == 0]
     
@@ -215,13 +206,10 @@ Please analyze the following assets for potential entry opportunities:
 - Funding Rate: {pos.get('fundingRate')}
 - Margin Ratio: {pos.get('marginRatio')}
 
-
 """
-    else:
-        summary += "### No active positions\n\n"
     
     if inactive:
-        summary += f"\n### CLOSED POSITIONS: ({len(inactive)} position(s))\n\n"
+        summary += f"### CLOSED POSITIONS: ({len(inactive)} position(s))\n\n"
         for pos in inactive:
             realized = safe_float(pos.get('realizedPnl', 0))
             summary += f"- **{pos.get('symbol')}**: Realized P&L: ${realized:.2f}\n"
@@ -230,144 +218,98 @@ Please analyze the following assets for potential entry opportunities:
 
 
 
-def generate_ai_trading_prompt(positions):
-    """Generate AI trading analysis prompt based on current positions"""
+def generate_position_analysis_prompt(positions):
+    """Generate prompt for analyzing current positions only"""
     
     active_positions = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
     
+    if not active_positions:
+        return "No active positions to analyze."
+    
     positions_summary = format_all_positions_for_analysis(positions)
     
-    if not active_positions:
-        # No open positions - generate prompt for new trading opportunities
-        prompt = f"""I'm a cryptocurrency trader using BingX. I need analysis for quick profit trading.
+    prompt = f"""POSITION ANALYSIS TASK:
 
 {positions_summary}
 
-You are a professional short-term trader focusing on quick profits. Analyze the latest market data for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA) with emphasis on:
+Analyze my current open positions and provide:
 
-1. **Immediate Entry Signals:**
-   - Buy or sell signals suitable for quick entry and exit
-   - Key support/resistance levels for scalping/swing trades
-   - Entry and exit prices with tight stop-loss levels
-   - Brief explanation of short-term trends, volatility, catalysts
+1. **CURRENT POSITION STATUS TABLE:**
+   | Symbol | Side | Entry | Mark | P&L $ | P&L % | Leverage | Liquidation | Margin Ratio | Status |
+   
+2. **POSITION MANAGEMENT RECOMMENDATIONS:**
+   For each position:
+   - Should I HOLD, ADD, or EXIT?
+   - Current risk/reward ratio
+   - Recommended stop-loss level
+   - Take-profit targets
+   - Time to exit recommendation (if any)
 
-2. **Profit Targets:**
-   - Potential quick profit targets (1-5% gains)
-   - Risk-to-reward ratio for each setup
-   - Volume spike analysis and momentum indicators (RSI, MACD, Stochastic Oscillator)
+3. **RISK ASSESSMENT:**
+   - Overall portfolio leverage
+   - Funding rate impact per position
+   - Correlation risks between positions
+   - Liquidation risk analysis
+   - Margin requirements vs available margin
 
-3. **Risk Management:**
-   - Highlight any rapid trading risks
-   - Position sizing recommendations
-   - Market volatility assessment
+4. **ACTION ITEMS:**
+   | Symbol | Action | Target Price | Reason | Priority |
 
-4. **Trading Orders to Place:**
-   - Specific buy/sell orders with exact prices
-   - Recommended entry points with quantities
-   - Stop-loss and take-profit prices
-   - Order types (limit, market, etc.)
+Format as structured tables with specific numbers. Be precise and actionable."""
 
-Present in a concise table for fast decision-making. Prioritize actionable, timely, high-probability setups for rapid gains.
-
-⚠️ NOTE: Currently NO open positions. These recommendations are for potential NEW entries to execute immediately."""
-    else:
-        # With open positions - generate prompt considering current holdings
-        prompt = f"""I'm a cryptocurrency trader using BingX. I need comprehensive analysis for my portfolio.
-
-{positions_summary}
-
-Based on my open positions and the current market for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA), provide:
-
-1. **CURRENT POSITION ANALYSIS:**
-   - For each open position: Should I hold, add to, or exit?
-   - Current risk/reward assessment
-   - Stop-loss and take-profit recommendations
-   - Unrealized P&L interpretation and next moves
-
-2. **NEW TRADING OPPORTUNITIES:**
-   - Immediate buy or sell signals for assets without positions
-   - Key support/resistance levels
-   - Entry and exit prices with tight stop-loss levels
-   - Estimate quick profit targets (1-5% gains)
-   - Momentum indicators (RSI, MACD, Stochastic) analysis
-
-3. **PORTFOLIO RISK MANAGEMENT:**
-   - Overall portfolio health assessment
-   - Leverage and margin ratio evaluation
-   - Funding rate impact on profitability
-   - Position balance recommendations
-   - Overall market risks and catalysts
-   - Diversification suggestions
-
-4. **QUICK PROFIT STRATEGY:**
-   - Short-term trading opportunities (scalping/swing)
-   - Volume spike analysis
-   - Volatility assessment for each asset
-   - Time-sensitive catalysts or news
-
-5. **TRADING ORDERS TO PLACE:**
-   - Specific orders for position adjustments
-   - New entry points for uncovered assets
-   - Exit prices for current positions if needed
-
-Focus on short-term trends and actionable recommendations. Present in a concise table format for fast decision-making.
-MOST IMPORTANT: real time data price 
-
-CRITICAL FORMATTING REQUIREMENTS FOR RESPONSE:
-1. Use markdown tables with pipe delimiters (|)
-2. Include table headers with dashes (---)
-3. Each data row must be a complete table row
-4. One asset/position per row in tables
-5. Format: | Column1 | Column2 | Column3 | ... |
-6. Use section headers (##) to separate analysis areas
-7. Provide specific numbers, not ranges or estimates
-8. Include units (%, $, etc.) in values
-9. Make tables copy-paste ready for Google Sheets
-10. Keep analysis rows aligned with table columns
-"""
-    
     return prompt
 
 
 
-def print_ai_prompt_section(positions):
-    """Print the AI prompt that should be sent to an AI model"""
-    print("\n" + "=" * 100)
-    print("AI TRADING PROMPT FOR DEEP RESEARCH & QUICK PROFIT ANALYSIS")
-    print("=" * 100)
-    print()
+def generate_market_research_prompt():
+    """Generate prompt for deep market research on assets"""
     
-    prompt = generate_ai_trading_prompt(positions)
-    print(prompt)
-    
-    print("\n" + "=" * 100)
-    print("USAGE INSTRUCTIONS:")
-    print("=" * 100)
-    print("""
-1. Copy the prompt above
-2. Send it to your AI model (ChatGPT, Claude, Perplexity, etc.)
-3. The AI will analyze positions (if any) and recommend buy/sell actions
-4. The prompt automatically generates trading recommendations even with NO positions
-""")
+    prompt = """MARKET RESEARCH AND TRADING SIGNALS TASK:
 
+Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
 
+1. **CURRENT PRICE & SENTIMENT TABLE:**
+   | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
-def save_ai_prompt_to_file(positions, filename="ai_trading_prompt.txt"):
-    """Save the AI prompt to a text file"""
-    try:
-        prompt = generate_ai_trading_prompt(positions)
-        
-        with open(filename, "w") as f:
-            f.write("AI TRADING PROMPT FOR QUICK PROFIT ANALYSIS\n")
-            f.write("=" * 100 + "\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("=" * 100 + "\n\n")
-            f.write(prompt)
-        
-        print(f"\n✅ AI prompt saved to: {filename}")
-        
-    except Exception as e:
-        print(f"❌ Error saving AI prompt: {e}")
+2. **TECHNICAL ANALYSIS TABLE:**
+   | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
+
+3. **FUNDAMENTAL CATALYSTS:**
+   For each asset:
+   - Recent news and events
+   - Upcoming earnings or economic data
+   - Regulatory updates
+   - Market sentiment indicators
+
+4. **TRADING OPPORTUNITIES TABLE:**
+   | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
+
+5. **SHORT-TERM TRADING SETUPS:**
+   - Scalping opportunities (quick 1-5% gains)
+   - Swing trade setups (5-15% gains)
+   - Momentum plays with catalysts
+   - Volume spike analysis
+
+6. **EXECUTION PLAN:**
+   | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
+
+7. **MARKET CORRELATIONS & RISKS:**
+   - Asset correlations
+   - Sector movements affecting each asset
+   - Macro risks (interest rates, economic data)
+   - Timing considerations for entries
+
+CRITICAL REQUIREMENTS:
+- Use REAL-TIME current prices and data
+- Provide specific price levels (not ranges)
+- Include all units ($, %, etc.)
+- Format all data as copy-paste ready for Google Sheets
+- Cite news sources for catalysts
+- Use section headers (##) for organization
+- Be specific about timeframes for trades
+- Include confidence levels and risk assessments"""
+
+    return prompt
 
 
 
@@ -397,14 +339,13 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
             if sheet['properties']['title'] == sheet_name:
                 return True
         
-        # Create sheet
         service.spreadsheets().batchUpdate(
             spreadsheetId=sheet_id,
             body={'requests': [{
                 'addSheet': {
                     'properties': {
                         'title': sheet_name,
-                        'gridProperties': {'rowCount': 1000, 'columnCount': 20}
+                        'gridProperties': {'rowCount': 2000, 'columnCount': 20}
                     }
                 }
             }]}
@@ -417,12 +358,11 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
 
 
 def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
-    """Write ALL positions (including closed ones) to Google Sheets with safe value handling"""
+    """Write ALL positions to Google Sheets"""
     try:
         sheet_name = "All Positions"
         ensure_sheet_exists(service, sheet_id, sheet_name)
         
-        # Extended headers
         headers = [
             "Timestamp", "Symbol", "Side", "Status", "Entry Price", "Mark Price", 
             "Contracts", "Notional Value", "Unrealized P&L", "Realized P&L", 
@@ -431,22 +371,14 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         ]
         
         rows = [headers]
-        active_count = 0
-        closed_count = 0
         
         if not positions:
             rows.append([timestamp, "NO POSITIONS", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"])
-            print(f"✅ No positions to write - recorded in sheet")
+            print(f"✅ No positions - recorded in sheet")
         else:
-            # Loop through ALL positions with safe value handling
             for pos in positions:
                 contracts = safe_float(pos.get('contracts', 0))
                 status = "ACTIVE" if contracts > 0 else "CLOSED"
-                
-                if status == "ACTIVE":
-                    active_count += 1
-                else:
-                    closed_count += 1
                 
                 unrealized = safe_float(pos.get('unrealizedPnl', 0))
                 realized = safe_float(pos.get('realizedPnl', 0))
@@ -481,13 +413,10 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
                     safe_round(margin_ratio, 4),
                     safe_round(percentage, 2)
                 ])
-            
-            print(f"✅ Wrote {active_count} active + {closed_count} closed position(s) to sheet")
         
-        # Clear and update sheet
         service.spreadsheets().values().clear(
             spreadsheetId=sheet_id,
-            range=f'{sheet_name}!A1:S1000'
+            range=f'{sheet_name}!A1:S2000'
         ).execute()
         
         service.spreadsheets().values().update(
@@ -497,41 +426,42 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
             body={'values': rows}
         ).execute()
         
+        print(f"✅ Updated 'All Positions' sheet")
+        
     except Exception as e:
-        print(f"❌ Error writing to sheet: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error writing positions: {e}")
         raise
 
 
 
-def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
-    """Write Perplexity analysis to Google Sheet"""
+def write_to_analysis_sheet(service, sheet_id, analysis_type, analysis_content, timestamp):
+    """Write analysis to appropriate sheet"""
     try:
-        sheet_name = "Analysis"
+        sheet_name = analysis_type
         ensure_sheet_exists(service, sheet_id, sheet_name)
-        
-        # Split analysis into paragraphs and write each as a row
-        paragraphs = analysis.split('\n\n')
         
         rows = [
             ["Timestamp", f"{timestamp}"],
-            ["Analysis Date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            ["Type", analysis_type],
+            ["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
             ["", ""],
-            ["Analysis Results", ""]
+            ["Analysis", ""]
         ]
         
-        for para in paragraphs:
-            if para.strip():
-                lines = para.split('\n')
-                for line in lines:
-                    if line.strip():
-                        rows.append([line.strip()])
+        lines = analysis_content.split('\n')
+        for line in lines:
+            if line.strip():
+                # Try to split table rows
+                if line.startswith('|'):
+                    cells = [cell.strip() for cell in line.split('|') if cell.strip()]
+                    if cells:
+                        rows.append(cells if len(cells) > 1 else [cells[0]])
+                else:
+                    rows.append([line.strip()])
         
-        # Clear and update sheet
         service.spreadsheets().values().clear(
             spreadsheetId=sheet_id,
-            range=f'{sheet_name}!A1:B1000'
+            range=f'{sheet_name}!A1:Z2000'
         ).execute()
         
         service.spreadsheets().values().update(
@@ -541,50 +471,79 @@ def write_analysis_to_sheet(service, sheet_id, analysis, timestamp):
             body={'values': rows}
         ).execute()
         
-        print(f"✅ Wrote analysis to 'Analysis' sheet")
+        print(f"✅ Updated '{sheet_name}' sheet")
         
     except Exception as e:
-        print(f"❌ Error writing analysis to sheet: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error writing to sheet: {e}")
         raise
 
 
 
-def send_to_perplexity_for_analysis(positions, perplexity_api_key):
-    """Send all position data to Perplexity API for DEEP research analysis"""
+def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
+    """Send position analysis request to Perplexity"""
     try:
-        print("\nSending to Perplexity (Deep Research Mode) for analysis...")
+        active_positions = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
         
-        prompt = generate_ai_trading_prompt(positions)
+        if not active_positions:
+            print("⚠️  No active positions - skipping position analysis")
+            return None
         
-        # Enhanced prompt for deep research
-        deep_research_prompt = f"""{prompt}
-
-RESEARCH REQUIREMENTS FOR DEEP ANALYSIS:
-1. Search for latest market sentiment and technical analysis
-2. Find recent news catalysts affecting each asset
-3. Analyze funding rates and leverage trends
-4. Check correlation between assets
-5. Research upcoming events/earnings/economic data
-6. Compare current prices vs historical support/resistance
-7. Analyze volume patterns and order book dynamics
-8. Identify institutional positioning if available
-9. Research regulatory updates affecting these assets
-10. Provide multiple trading scenarios with probabilities
-
-Be thorough and cite all sources. Include specific data points, percentages, and timeframes.
-Provide actionable trading orders ready to execute immediately."""
-
+        print("\n📊 Sending position analysis to Perplexity (Research Mode)...")
+        
+        prompt = generate_position_analysis_prompt(positions)
+        
         headers = {
             "Authorization": f"Bearer {perplexity_api_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "model": "sonar",  # Research mode
+            "model": "sonar",
             "messages": [
-                {"role": "user", "content": deep_research_prompt}
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.5,
+            "top_p": 0.9,
+            "max_tokens": 2000,
+            "search_recency_filter": "week"
+        }
+        
+        response = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120
+        )
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        analysis = result['choices'][0]['message']['content']
+        print("✓ Received position analysis from Perplexity")
+        
+        return analysis
+    except Exception as e:
+        print(f"❌ Error in position analysis: {e}")
+        return None
+
+
+
+def send_to_perplexity_for_market_research(perplexity_api_key):
+    """Send market research request to Perplexity"""
+    try:
+        print("\n🔍 Sending market research request to Perplexity (Deep Research Mode)...")
+        
+        prompt = generate_market_research_prompt()
+        
+        headers = {
+            "Authorization": f"Bearer {perplexity_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "sonar",
+            "messages": [
+                {"role": "user", "content": prompt}
             ],
             "temperature": 0.5,
             "top_p": 0.9,
@@ -603,23 +562,20 @@ Provide actionable trading orders ready to execute immediately."""
         response.raise_for_status()
         result = response.json()
         
-        analysis = result['choices'][0]['message']['content']
-        print("✓ Received deep research analysis from Perplexity")
+        research = result['choices'][0]['message']['content']
+        print("✓ Received market research from Perplexity")
         
-        return analysis
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error communicating with Perplexity: {e}")
-        return "Error: Could not retrieve analysis from Perplexity"
+        return research
     except Exception as e:
-        print(f"❌ Error processing Perplexity response: {e}")
-        return f"Error: {str(e)}"
+        print(f"❌ Error in market research: {e}")
+        return None
 
 
 
 if __name__ == "__main__":
     try:
         print("=" * 100)
-        print("BingX Portfolio Tracker with Perplexity Deep Research Analysis")
+        print("BingX Portfolio Tracker - All Analysis to Google Sheets")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 100)
         print()
@@ -634,14 +590,8 @@ if __name__ == "__main__":
         # Get all positions
         positions = get_positions(api_key, api_secret)
         
-        # Continue even if no positions
+        # Print position details
         print_all_positions_detailed(positions)
-        
-        # Generate and print AI trading prompt (works with or without positions)
-        print_ai_prompt_section(positions)
-        
-        # Save AI prompt to file
-        save_ai_prompt_to_file(positions)
         
         # Load Google credentials
         load_google_credentials()
@@ -658,22 +608,30 @@ if __name__ == "__main__":
         service = build('sheets', 'v4', credentials=creds)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Write positions to sheet (even if empty)
+        # Write positions to sheet
         write_all_positions_to_sheet(service, SHEET_ID, positions, timestamp)
         
-        # Send positions to Perplexity for analysis
-        analysis = send_to_perplexity_for_analysis(positions, perplexity_api_key)
+        # PART 1: Position Analysis (if have positions)
+        position_analysis = send_to_perplexity_for_position_analysis(positions, perplexity_api_key)
         
-        # Write analysis to sheet
-        write_analysis_to_sheet(service, SHEET_ID, analysis, timestamp)
+        if position_analysis:
+            write_to_analysis_sheet(service, SHEET_ID, "Position Analysis", position_analysis, timestamp)
+        
+        # PART 2: Market Research (always run)
+        market_research = send_to_perplexity_for_market_research(perplexity_api_key)
+        
+        if market_research:
+            write_to_analysis_sheet(service, SHEET_ID, "Market Research", market_research, timestamp)
         
         print()
         print("=" * 100)
-        print("✅ Tracker completed successfully")
+        print("✅ Tracker completed successfully - All data written to Google Sheets")
         print("=" * 100)
-        print("\n📁 Generated files:")
-        print("   - ai_trading_prompt.txt (Trading recommendations)")
-        print("   - Google Sheet updated with analysis")
+        print("\n📊 Google Sheets updated:")
+        print("   - 'All Positions' sheet (current holdings)")
+        if position_analysis:
+            print("   - 'Position Analysis' sheet (hold/exit/add recommendations)")
+        print("   - 'Market Research' sheet (trading signals & opportunities)")
         
     except Exception as e:
         print(f"❌ Fatal error: {e}")
