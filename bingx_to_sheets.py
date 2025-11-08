@@ -6,17 +6,11 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 import requests
 
-
-
 # Map ccxt module
 import bingx.ccxt as ccxt_module
 sys.modules['ccxt'] = ccxt_module
 
-
-
 from bingx.ccxt import bingx as BingxSync
-
-
 
 
 def load_api_keys():
@@ -39,8 +33,6 @@ def load_api_keys():
         raise Exception("API keys not found in environment or api_key.json")
 
 
-
-
 def load_perplexity_api_key():
     """Load Perplexity API key from environment or file"""
     api_key = os.getenv('PERPLEXITY_API_KEY')
@@ -60,8 +52,6 @@ def load_perplexity_api_key():
         raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
-
-
 def safe_float(value, default=0.0):
     """Safely convert value to float with default fallback"""
     if value is None:
@@ -72,14 +62,10 @@ def safe_float(value, default=0.0):
         return default
 
 
-
-
 def safe_round(value, decimals=8, default=0.0):
     """Safely round a value"""
     num = safe_float(value, default)
     return round(num, decimals)
-
-
 
 
 def get_positions(api_key, api_secret):
@@ -104,8 +90,6 @@ def get_positions(api_key, api_secret):
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
-
-
 
 
 def get_all_position_fields(position):
@@ -157,8 +141,6 @@ def get_all_position_fields(position):
     return fields
 
 
-
-
 def print_all_positions_detailed(positions):
     """Print detailed information for ALL positions"""
     if not positions:
@@ -185,8 +167,6 @@ def print_all_positions_detailed(positions):
                 for field_name, value in fields_dict.items():
                     if value is not None:
                         print(f"    {field_name}: {value}")
-
-
 
 
 def format_all_positions_for_analysis(positions):
@@ -228,8 +208,6 @@ def format_all_positions_for_analysis(positions):
     return summary
 
 
-
-
 def generate_position_analysis_prompt(positions):
     """Generate prompt for analyzing current positions only"""
     
@@ -242,12 +220,9 @@ def generate_position_analysis_prompt(positions):
     
     prompt = f"""POSITION ANALYSIS TASK:
 
-
 {positions_summary}
 
-
 Analyze my current open positions and provide:
-
 
 1. **CURRENT POSITION STATUS TABLE:**
    | Symbol | Side | Entry | Mark | P&L $ | P&L % | Leverage | Liquidation | Margin Ratio | Status |
@@ -260,7 +235,6 @@ Analyze my current open positions and provide:
    - Take-profit targets
    - Time to exit recommendation (if any)
 
-
 3. **RISK ASSESSMENT:**
    - Overall portfolio leverage
    - Funding rate impact per position
@@ -268,17 +242,12 @@ Analyze my current open positions and provide:
    - Liquidation risk analysis
    - Margin requirements vs available margin
 
-
 4. **ACTION ITEMS:**
    | Symbol | Action | Target Price | Reason | Priority |
 
-
 Format as structured tables with specific numbers. Be precise and actionable."""
 
-
     return prompt
-
-
 
 
 def generate_market_research_prompt():
@@ -286,17 +255,13 @@ def generate_market_research_prompt():
     
     prompt = """MARKET RESEARCH AND TRADING SIGNALS TASK:
 
-
 Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
-
 
 1. **CURRENT PRICE & SENTIMENT TABLE:**
    | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
-
 2. **TECHNICAL ANALYSIS TABLE:**
    | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
-
 
 3. **FUNDAMENTAL CATALYSTS:**
    For each asset:
@@ -305,10 +270,8 @@ Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (
    - Regulatory updates
    - Market sentiment indicators
 
-
 4. **TRADING OPPORTUNITIES TABLE:**
    | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
-
 
 5. **SHORT-TERM TRADING SETUPS:**
    - Scalping opportunities (quick 1-5% gains)
@@ -316,17 +279,14 @@ Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (
    - Momentum plays with catalysts
    - Volume spike analysis
 
-
 6. **EXECUTION PLAN:**
    | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
-
 
 7. **MARKET CORRELATIONS & RISKS:**
    - Asset correlations
    - Sector movements affecting each asset
    - Macro risks (interest rates, economic data)
    - Timing considerations for entries
-
 
 CRITICAL REQUIREMENTS:
 - Use REAL-TIME current prices and data
@@ -338,10 +298,7 @@ CRITICAL REQUIREMENTS:
 - Be specific about timeframes for trades
 - Include confidence levels and risk assessments"""
 
-
     return prompt
-
-
 
 
 def load_google_credentials():
@@ -358,8 +315,6 @@ def load_google_credentials():
         raise Exception("Google credentials not found in environment or file")
     
     print("✓ Google credentials loaded from file")
-
-
 
 
 def ensure_sheet_exists(service, sheet_id, sheet_name):
@@ -386,8 +341,6 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
         return True
     except Exception as e:
         raise
-
-
 
 
 def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
@@ -466,18 +419,10 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         raise
 
 
-
-
-def format_market_research_for_csv(analysis_content):
-    """Format market research analysis into CSV-compatible rows"""
+def format_analysis_for_csv(analysis_content):
+    """Format analysis content into CSV-compatible rows"""
     try:
-        rows = [
-            ["Timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            ["Type", "Market Research"],
-            ["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            ["", ""]
-        ]
-        
+        rows = []
         lines = analysis_content.split('\n')
         
         for line in lines:
@@ -497,40 +442,48 @@ def format_market_research_for_csv(analysis_content):
             # Handle headers with ##
             elif line.startswith('##'):
                 header = line.replace('##', '').replace('#', '').strip()
-                rows.append([header])  # Section header as single cell
-                rows.append([""])  # Empty row for spacing
+                if header:
+                    rows.append([header])
+                    rows.append([""])
             
             # Handle bullet points
             elif line.startswith('-'):
                 content = line[1:].strip()
-                rows.append([content])
+                if content:
+                    rows.append([content])
             
             # Handle bold text
             elif '**' in line:
                 content = line.replace('**', '').strip()
-                rows.append([content])
+                if content:
+                    rows.append([content])
             
-            # Regular text
-            else:
+            # Regular text (longer than 10 chars)
+            elif len(line) > 10:
                 rows.append([line])
         
-        return rows
+        return rows if rows else [["No data"]]
     
     except Exception as e:
-        print(f"Error formatting market research: {e}")
-        return [["Error parsing market research"]]
+        print(f"Error formatting analysis: {e}")
+        return [["Error parsing analysis"]]
 
 
-
-
-def write_market_research_to_sheet(service, sheet_id, analysis_content):
-    """Write market research to Google Sheets in CSV-compatible format"""
+def write_to_analysis_sheet(service, sheet_id, sheet_name, analysis_content, timestamp):
+    """Write analysis to Google Sheets in CSV-compatible format"""
     try:
-        sheet_name = "Market Research"
         ensure_sheet_exists(service, sheet_id, sheet_name)
         
-        # Format analysis into rows
-        rows = format_market_research_for_csv(analysis_content)
+        rows = [
+            ["Timestamp", timestamp],
+            ["Type", sheet_name],
+            ["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            ["", ""]
+        ]
+        
+        # Format and add analysis
+        analysis_rows = format_analysis_for_csv(analysis_content)
+        rows.extend(analysis_rows)
         
         # Clear existing data
         service.spreadsheets().values().clear(
@@ -546,13 +499,11 @@ def write_market_research_to_sheet(service, sheet_id, analysis_content):
             body={'values': rows}
         ).execute()
         
-        print(f"✅ Updated 'Market Research' sheet with {len(rows)} rows")
+        print(f"✅ Updated '{sheet_name}' sheet with {len(rows)} rows")
         
     except Exception as e:
-        print(f"❌ Error writing market research: {e}")
+        print(f"❌ Error writing to {sheet_name}: {e}")
         raise
-
-
 
 
 def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
@@ -603,8 +554,6 @@ def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
         return None
 
 
-
-
 def send_to_perplexity_for_market_research(perplexity_api_key):
     """Send market research request to Perplexity"""
     try:
@@ -646,8 +595,6 @@ def send_to_perplexity_for_market_research(perplexity_api_key):
     except Exception as e:
         print(f"❌ Error in market research: {e}")
         return None
-
-
 
 
 if __name__ == "__main__":
@@ -701,7 +648,7 @@ if __name__ == "__main__":
         
         if market_research:
             print("Market research received, formatting for CSV-compatible sheets...")
-            write_market_research_to_sheet(service, SHEET_ID, market_research)
+            write_to_analysis_sheet(service, SHEET_ID, "Market Research", market_research, timestamp)
         
         print()
         print("=" * 100)
