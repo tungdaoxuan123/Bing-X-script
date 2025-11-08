@@ -7,12 +7,15 @@ from googleapiclient.discovery import build
 import requests
 
 
+
 # Map ccxt module
 import bingx.ccxt as ccxt_module
 sys.modules['ccxt'] = ccxt_module
 
 
+
 from bingx.ccxt import bingx as BingxSync
+
 
 
 
@@ -37,6 +40,7 @@ def load_api_keys():
 
 
 
+
 def load_perplexity_api_key():
     """Load Perplexity API key from environment or file"""
     api_key = os.getenv('PERPLEXITY_API_KEY')
@@ -57,6 +61,7 @@ def load_perplexity_api_key():
 
 
 
+
 def safe_float(value, default=0.0):
     """Safely convert value to float with default fallback"""
     if value is None:
@@ -68,10 +73,12 @@ def safe_float(value, default=0.0):
 
 
 
+
 def safe_round(value, decimals=8, default=0.0):
     """Safely round a value"""
     num = safe_float(value, default)
     return round(num, decimals)
+
 
 
 
@@ -97,6 +104,7 @@ def get_positions(api_key, api_secret):
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
+
 
 
 
@@ -150,6 +158,7 @@ def get_all_position_fields(position):
 
 
 
+
 def print_all_positions_detailed(positions):
     """Print detailed information for ALL positions"""
     if not positions:
@@ -176,6 +185,7 @@ def print_all_positions_detailed(positions):
                 for field_name, value in fields_dict.items():
                     if value is not None:
                         print(f"    {field_name}: {value}")
+
 
 
 
@@ -206,6 +216,7 @@ def format_all_positions_for_analysis(positions):
 - Funding Rate: {pos.get('fundingRate')}
 - Margin Ratio: {pos.get('marginRatio')}
 
+
 """
     
     if inactive:
@@ -215,6 +226,7 @@ def format_all_positions_for_analysis(positions):
             summary += f"- **{pos.get('symbol')}**: Realized P&L: ${realized:.2f}\n"
     
     return summary
+
 
 
 
@@ -230,9 +242,12 @@ def generate_position_analysis_prompt(positions):
     
     prompt = f"""POSITION ANALYSIS TASK:
 
+
 {positions_summary}
 
+
 Analyze my current open positions and provide:
+
 
 1. **CURRENT POSITION STATUS TABLE:**
    | Symbol | Side | Entry | Mark | P&L $ | P&L % | Leverage | Liquidation | Margin Ratio | Status |
@@ -245,6 +260,7 @@ Analyze my current open positions and provide:
    - Take-profit targets
    - Time to exit recommendation (if any)
 
+
 3. **RISK ASSESSMENT:**
    - Overall portfolio leverage
    - Funding rate impact per position
@@ -252,12 +268,16 @@ Analyze my current open positions and provide:
    - Liquidation risk analysis
    - Margin requirements vs available margin
 
+
 4. **ACTION ITEMS:**
    | Symbol | Action | Target Price | Reason | Priority |
 
+
 Format as structured tables with specific numbers. Be precise and actionable."""
 
+
     return prompt
+
 
 
 
@@ -266,13 +286,17 @@ def generate_market_research_prompt():
     
     prompt = """MARKET RESEARCH AND TRADING SIGNALS TASK:
 
+
 Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
+
 
 1. **CURRENT PRICE & SENTIMENT TABLE:**
    | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
+
 2. **TECHNICAL ANALYSIS TABLE:**
    | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
+
 
 3. **FUNDAMENTAL CATALYSTS:**
    For each asset:
@@ -281,8 +305,10 @@ Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (
    - Regulatory updates
    - Market sentiment indicators
 
+
 4. **TRADING OPPORTUNITIES TABLE:**
    | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
+
 
 5. **SHORT-TERM TRADING SETUPS:**
    - Scalping opportunities (quick 1-5% gains)
@@ -290,14 +316,17 @@ Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (
    - Momentum plays with catalysts
    - Volume spike analysis
 
+
 6. **EXECUTION PLAN:**
    | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
+
 
 7. **MARKET CORRELATIONS & RISKS:**
    - Asset correlations
    - Sector movements affecting each asset
    - Macro risks (interest rates, economic data)
    - Timing considerations for entries
+
 
 CRITICAL REQUIREMENTS:
 - Use REAL-TIME current prices and data
@@ -309,7 +338,9 @@ CRITICAL REQUIREMENTS:
 - Be specific about timeframes for trades
 - Include confidence levels and risk assessments"""
 
+
     return prompt
+
 
 
 
@@ -327,6 +358,7 @@ def load_google_credentials():
         raise Exception("Google credentials not found in environment or file")
     
     print("✓ Google credentials loaded from file")
+
 
 
 
@@ -354,6 +386,7 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
         return True
     except Exception as e:
         raise
+
 
 
 
@@ -434,36 +467,78 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
 
 
 
-def write_to_analysis_sheet(service, sheet_id, analysis_type, analysis_content, timestamp):
-    """Write analysis to appropriate sheet"""
+
+def format_market_research_for_csv(analysis_content):
+    """Format market research analysis into CSV-compatible rows"""
     try:
-        sheet_name = analysis_type
-        ensure_sheet_exists(service, sheet_id, sheet_name)
-        
         rows = [
-            ["Timestamp", f"{timestamp}"],
-            ["Type", analysis_type],
+            ["Timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            ["Type", "Market Research"],
             ["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            ["", ""],
-            ["Analysis", ""]
+            ["", ""]
         ]
         
         lines = analysis_content.split('\n')
-        for line in lines:
-            if line.strip():
-                # Try to split table rows
-                if line.startswith('|'):
-                    cells = [cell.strip() for cell in line.split('|') if cell.strip()]
-                    if cells:
-                        rows.append(cells if len(cells) > 1 else [cells[0]])
-                else:
-                    rows.append([line.strip()])
         
+        for line in lines:
+            line = line.strip()
+            
+            if not line:
+                continue
+            
+            # Handle table rows (CSV format for Sheets)
+            if line.startswith('|'):
+                # Parse markdown table
+                cells = [cell.strip() for cell in line.split('|')]
+                cells = [cell for cell in cells if cell and cell != '---' and not all(c == '-' for c in cell)]
+                if cells:
+                    rows.append(cells)
+            
+            # Handle headers with ##
+            elif line.startswith('##'):
+                header = line.replace('##', '').replace('#', '').strip()
+                rows.append([header])  # Section header as single cell
+                rows.append([""])  # Empty row for spacing
+            
+            # Handle bullet points
+            elif line.startswith('-'):
+                content = line[1:].strip()
+                rows.append([content])
+            
+            # Handle bold text
+            elif '**' in line:
+                content = line.replace('**', '').strip()
+                rows.append([content])
+            
+            # Regular text
+            else:
+                rows.append([line])
+        
+        return rows
+    
+    except Exception as e:
+        print(f"Error formatting market research: {e}")
+        return [["Error parsing market research"]]
+
+
+
+
+def write_market_research_to_sheet(service, sheet_id, analysis_content):
+    """Write market research to Google Sheets in CSV-compatible format"""
+    try:
+        sheet_name = "Market Research"
+        ensure_sheet_exists(service, sheet_id, sheet_name)
+        
+        # Format analysis into rows
+        rows = format_market_research_for_csv(analysis_content)
+        
+        # Clear existing data
         service.spreadsheets().values().clear(
             spreadsheetId=sheet_id,
             range=f'{sheet_name}!A1:Z2000'
         ).execute()
         
+        # Write new data
         service.spreadsheets().values().update(
             spreadsheetId=sheet_id,
             range=f'{sheet_name}!A1',
@@ -471,11 +546,12 @@ def write_to_analysis_sheet(service, sheet_id, analysis_type, analysis_content, 
             body={'values': rows}
         ).execute()
         
-        print(f"✅ Updated '{sheet_name}' sheet")
+        print(f"✅ Updated 'Market Research' sheet with {len(rows)} rows")
         
     except Exception as e:
-        print(f"❌ Error writing to sheet: {e}")
+        print(f"❌ Error writing market research: {e}")
         raise
+
 
 
 
@@ -528,6 +604,7 @@ def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
 
 
 
+
 def send_to_perplexity_for_market_research(perplexity_api_key):
     """Send market research request to Perplexity"""
     try:
@@ -569,6 +646,7 @@ def send_to_perplexity_for_market_research(perplexity_api_key):
     except Exception as e:
         print(f"❌ Error in market research: {e}")
         return None
+
 
 
 
@@ -615,26 +693,4 @@ if __name__ == "__main__":
         position_analysis = send_to_perplexity_for_position_analysis(positions, perplexity_api_key)
         
         if position_analysis:
-            write_to_analysis_sheet(service, SHEET_ID, "Position Analysis", position_analysis, timestamp)
-        
-        # PART 2: Market Research (always run)
-        market_research = send_to_perplexity_for_market_research(perplexity_api_key)
-        
-        if market_research:
-            write_to_analysis_sheet(service, SHEET_ID, "Market Research", market_research, timestamp)
-        
-        print()
-        print("=" * 100)
-        print("✅ Tracker completed successfully - All data written to Google Sheets")
-        print("=" * 100)
-        print("\n📊 Google Sheets updated:")
-        print("   - 'All Positions' sheet (current holdings)")
-        if position_analysis:
-            print("   - 'Position Analysis' sheet (hold/exit/add recommendations)")
-        print("   - 'Market Research' sheet (trading signals & opportunities)")
-        
-    except Exception as e:
-        print(f"❌ Fatal error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+            print("Position analysis received,
