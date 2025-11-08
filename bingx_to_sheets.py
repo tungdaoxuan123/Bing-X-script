@@ -348,12 +348,6 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
     try:
         sheet_name = "All Positions"
         ensure_sheet_exists(service, sheet_id, sheet_name)
-        # STEP 1: Clear ALL data from sheet (A1:Z5000)
-        print(f"🗑️  Clearing '{sheet_name}' sheet...")
-        service.spreadsheets().values().clear(
-            spreadsheetId=sheet_id,
-            range=f'{sheet_name}!A1:Z5000'
-        ).execute()
         
         headers = [
             "Timestamp", "Symbol", "Side", "Status", "Entry Price", "Mark Price", 
@@ -479,6 +473,12 @@ def write_to_analysis_sheet(service, sheet_id, sheet_name, analysis_content, tim
     """Write analysis to Google Sheets in CSV-compatible format"""
     try:
         ensure_sheet_exists(service, sheet_id, sheet_name)
+        # STEP 1: Clear ALL data from sheet (A1:Z5000)
+        print(f"🗑️  Clearing '{sheet_name}' sheet...")
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:Z5000'
+        ).execute()
         
         rows = [
             ["Timestamp", timestamp],
