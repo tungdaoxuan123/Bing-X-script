@@ -693,4 +693,28 @@ if __name__ == "__main__":
         position_analysis = send_to_perplexity_for_position_analysis(positions, perplexity_api_key)
         
         if position_analysis:
-            print("Position analysis received,
+            print("Position analysis received, formatting for sheets...")
+            write_to_analysis_sheet(service, SHEET_ID, "Position Analysis", position_analysis, timestamp)
+        
+        # PART 2: Market Research (always run)
+        market_research = send_to_perplexity_for_market_research(perplexity_api_key)
+        
+        if market_research:
+            print("Market research received, formatting for CSV-compatible sheets...")
+            write_market_research_to_sheet(service, SHEET_ID, market_research)
+        
+        print()
+        print("=" * 100)
+        print("✅ Tracker completed successfully - All data written to Google Sheets")
+        print("=" * 100)
+        print("\n📊 Google Sheets updated:")
+        print("   - 'All Positions' sheet (current holdings)")
+        if position_analysis:
+            print("   - 'Position Analysis' sheet (hold/exit/add recommendations)")
+        print("   - 'Market Research' sheet (trading signals & opportunities)")
+        
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
