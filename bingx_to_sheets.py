@@ -298,6 +298,8 @@ def generate_market_research_prompt():
     | [Repeat for AMZN, GOOGL, TSLA] | | | | | | | | | | | |
 
     **Convergence Rules (Multi-Timeframe Scoring):**
+
+    MAKE IT ALL AS TEXT
     """
     return prompt
 
