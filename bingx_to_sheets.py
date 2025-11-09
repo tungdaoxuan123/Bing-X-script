@@ -531,15 +531,21 @@ def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
             "Content-Type": "application/json"
         }
         
-        payload = {
+        {
             "model": "sonar",
             "messages": [
-                {"role": "user", "content": prompt}
+                {
+                    "role": "user",
+                    "content": "YOUR_MARKET_RESEARCH_PROMPT"
+                }
             ],
-            "temperature": 0.5,
-            "top_p": 0.9,
-            "max_tokens": 2000,
-            "search_recency_filter": "week"
+            "temperature": 0.2,
+            "top_p": 0.75,
+            "max_tokens": 8000,
+            "search_recency_filter": "day",
+            "return_citations": true,
+            "frequency_penalty": 0.1,
+            "presence_penalty": 0.0
         }
         
         response = requests.post(
