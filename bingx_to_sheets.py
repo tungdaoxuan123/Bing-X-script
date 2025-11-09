@@ -254,53 +254,51 @@ def generate_market_research_prompt():
     """Generate prompt for deep market research on assets with current time"""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    prompt = f"""
-    # REAL-TIME AUTONOMOUS TRADING SIGNAL GENERATOR v2.0
-    # Time generated: {current_time} (UTC+7)
-    # Data Freshness: CRITICAL - Timestamp all data to T±2 minutes
-    # Execution Context: FastAPI + Temporal + BingX/Live Market API Integration
+    prompt = f"""MARKET RESEARCH AND TRADING SIGNALS TASK:
+    Time generated: {current_time}
 
-    ## PRE-EXECUTION CHECKLIST
-    - ✓ Verify data source latency < 2min (reject signals if > 5min old)
-    - ✓ Check market hours: BTC 24/7, AMZN/GOOGL/TSLA 9:30-16:00 EST
-    - ✓ Monitor network latency to BingX API (target <200ms)
-    - ✓ Load last 50 candles for each asset (1m, 5m, 15m, 1h, 4h)
+    Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
+    - Use REAL-TIME current prices and data on [https://coinmarketcap.com/](https://coinmarketcap.com/)
+    1. **CURRENT PRICE & SENTIMENT TABLE:**
+    | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
-    ## SECTION 1: REAL-TIME PRICE & SENTIMENT TABLE
-    **Source**: CoinGecko API (crypto) + EODHD WebSocket (<50ms latency)
-    **Update Frequency**: Every 60 seconds for holdings; every 1 minute for analysis
+    2. **TECHNICAL ANALYSIS TABLE:**
+    | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
 
-    | Asset | Current Price | 24h High | 24h Low | 24h Change % | 24h Volume | Bid-Ask Spread % | Liquidity Rank | Data Timestamp | Signal |
-    |-------|---|---|---|---|---|---|---|---|---|
-    | BTC | $[live] | $[live] | $[live] | [live]% | $[live]B | [calc] | [1-100] | T ± 2min | [RSI-based] |
-    | AMZN | $[live] | $[live] | $[live] | [live]% | [live]M | [calc] | [1-500] | T ± 2min | [RSI-based] |
-    | GOOGL | $[live] | $[live] | $[live] | [live]% | [live]M | [calc] | [1-500] | T ± 2min | [RSI-based] |
-    | TSLA | $[live] | $[live] | $[live] | [live]% | [live]M | [calc] | [1-500] | T ± 2min | [RSI-based] |
+    3. **FUNDAMENTAL CATALYSTS:**
+    For each asset:
+    - Recent news and events
+    - Upcoming earnings or economic data
+    - Regulatory updates
+    - Market sentiment indicators
 
-    **Interpretation Rules:**
-    - RSI > 70: OVERBOUGHT (consider exits, reduce size by 50%)
-    - RSI < 30: OVERSOLD (consider entries, increase size by 50%)
-    - Spread > 2%: LOW liquidity warning, reduce position size
-    - Volume decline > 40% MoM: Momentum fading, reduce confidence by 20%
+    4. **TRADING OPPORTUNITIES TABLE:**
+    | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
 
-    ---
+    5. **SHORT-TERM TRADING SETUPS:**
+    - Scalping opportunities (quick 1-5% gains)
+    - Swing trade setups (5-15% gains)
+    - Momentum plays with catalysts
+    - Volume spike analysis
 
-    ## SECTION 2: MULTI-TIMEFRAME TECHNICAL ANALYSIS TABLE
-    **Data Source**: Last 50 candlesticks at each timeframe (1m, 5m, 15m, 1h, 4h)
-    **Calculation Method**: TA-Lib standard (RSI period=14, MACD 12/26/9)
+    6. **EXECUTION PLAN:**
+    | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
 
-    | Asset | Timeframe | RSI | MACD Signal | MACD Histogram | SMA20 | SMA50 | Price vs SMA | Bollinger %B | Volume Trend | Trend Strength | Action |
-    |-------|-----------|-----|-------------|----------------|-------|-------|---|---|---|---|---|
-    | BTC | 1m | [V] | [V] | [V] | [V] | [V] | [%] | [0-100] | [↑/→/↓] | [0-100] | [HOLD/BUY/SELL] |
-    | BTC | 5m | [V] | [V] | [V] | [V] | [V] | [%] | [0-100] | [↑/→/↓] | [0-100] | [HOLD/BUY/SELL] |
-    | BTC | 15m | [V] | [V] | [V] | [V] | [V] | [%] | [0-100] | [↑/→/↓] | [0-100] | [HOLD/BUY/SELL] |
-    | BTC | 1h | [V] | [V] | [V] | [V] | [V] | [%] | [0-100] | [↑/→/↓] | [0-100] | [HOLD/BUY/SELL] |
-    | [Repeat for AMZN, GOOGL, TSLA] | | | | | | | | | | | |
+    7. **MARKET CORRELATIONS & RISKS:**
+    - Asset correlations
+    - Sector movements affecting each asset
+    - Macro risks (interest rates, economic data)
+    - Timing considerations for entries
 
-    **Convergence Rules (Multi-Timeframe Scoring):**
-    FILL ALL the data into the box
-    MAKE IT ALL AS TEXT
-    """
+    CRITICAL REQUIREMENTS:
+    - Provide specific price levels (not ranges)
+    - Include all units ($, %, etc.)
+    - Format all data as copy-paste ready for Google Sheets
+    - Cite news sources for catalysts
+    - Use section headers (##) for organization
+    - Be specific about timeframes for trades
+- Include confidence levels and risk assessments"""
+    
     return prompt
 
 
