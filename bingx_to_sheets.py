@@ -15,23 +15,47 @@ from bingx.ccxt import bingx as BingxSync
 
 
 def load_api_keys():
-    """Load API keys from environment or file"""
-    api_key = os.getenv('BINGX_API_KEY')
-    api_secret = os.getenv('BINGX_API_SECRET')
-    
-    if api_key and api_secret:
-        print("✓ API keys loaded from environment")
-        return api_key, api_secret
-    
+    """Load API keys from api_key.json file"""
     try:
+        if not os.path.exists("api_key.json"):
+            print("❌ api_key.json not found!")
+            sys.exit(1)
+        
         with open("api_key.json", "r") as f:
             data = json.load(f)
-        if "api_key" not in data or "api_secret" not in data:
-            raise Exception("JSON file must contain 'api_key' and 'api_secret'")
-        print("✓ API keys loaded from file")
-        return data["api_key"], data["api_secret"]
+        
+        api_key = data.get("api-key")
+        secret_key = data.get("secret-key")
+        
+        if not api_key or not secret_key:
+            print("❌ api_key.json missing 'api-key' or 'secret-key'")
+            sys.exit(1)
+        
+        print("✓ API keys loaded from api_key.json")
+        return api_key, secret_key
+        
+    except Exception as e:
+        print(f"❌ Error loading API keys: {e}")
+        sys.exit(1)
+
+
+def load_perplexity_api_key():
+    """Load Perplexity API key from environment or file"""
+    api_key = os.getenv('PERPLEXITY_API_KEY')
+    
+    if api_key:
+        print("✓ Perplexity API key loaded from environment")
+        return api_key
+    
+    try:
+        with open("perplexity_key.json", "r") as f:
+            data = json.load(f)
+        if "api_key" not in data:
+            raise Exception("JSON file must contain 'api_key'")
+        print("✓ Perplexity API key loaded from file")
+        return data["api_key"]
     except FileNotFoundError:
-        raise Exception("API keys not found in environment or api_key.json")
+        raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
 def safe_float(value, default=0.0):
@@ -44,133 +68,14 @@ def safe_float(value, default=0.0):
         return default
 
 
-def safe_round(value, decimals=8, default=0.0):
+def safe_round(value, decimals=2, default=0.0):
     """Safely round a value"""
     num = safe_float(value, default)
     return round(num, decimals)
 
 
-def diagnose_account(api_key, api_secret):
-    """Diagnose account and show what's available"""
-    try:
-        print("\n" + "="*100)
-        print("ACCOUNT DIAGNOSTIC")
-        print("="*100)
-        
-        client = BingxSync({
-            'apiKey': api_key,
-            'secret': api_secret,
-            'enableRateLimit': True,
-            'options': {
-                'defaultType': 'swap'
-            }
-        })
-        
-        print("\n1. Testing fetch_balance():")
-        try:
-            balance = client.fetch_balance()
-            print(f"   ✓ Keys: {list(balance.keys())}")
-            print(f"   Total: ${safe_float(balance.get('total', 0)):.2f}")
-            print(f"   Free: ${safe_float(balance.get('free', 0)):.2f}")
-            print(f"   Used: ${safe_float(balance.get('used', 0)):.2f}")
-        except Exception as e:
-            print(f"   ❌ Error: {e}")
-        
-        print("\n2. Testing fetch_positions():")
-        try:
-            positions = client.fetch_positions()
-            active = [p for p in positions if safe_float(p.get('contracts', 0)) > 0]
-            print(f"   ✓ Found {len(positions)} total, {len(active)} active positions")
-            
-            if active:
-                pos = active[0]
-                print(f"   Sample: {pos.get('symbol')}")
-                print(f"     - Contracts: {pos.get('contracts')}")
-                print(f"     - Entry: {pos.get('entryPrice')}")
-                print(f"     - Unrealized P&L: {pos.get('unrealizedPnl')}")
-        except Exception as e:
-            print(f"   ❌ Error: {e}")
-        
-        print("\n" + "="*100 + "\n")
-        
-    except Exception as e:
-        print(f"❌ Diagnostic failed: {e}")
-
-
-def get_account_balance_from_positions(api_key, api_secret):
-    """Calculate balance from positions - MOST RELIABLE"""
-    try:
-        print("Calculating balance from positions...")
-        
-        client = BingxSync({
-            'apiKey': api_key,
-            'secret': api_secret,
-            'enableRateLimit': True,
-            'options': {
-                'defaultType': 'swap'
-            }
-        })
-        
-        # Get positions
-        positions = client.fetch_positions()
-        
-        total_collateral = 0
-        total_unrealized_pnl = 0
-        total_realized_pnl = 0
-        active_positions = 0
-        
-        for pos in positions:
-            contracts = safe_float(pos.get('contracts', 0))
-            collateral = safe_float(pos.get('collateral', 0))
-            unrealized = safe_float(pos.get('unrealizedPnl', 0))
-            realized = safe_float(pos.get('realizedPnl', 0))
-            
-            if contracts > 0:
-                active_positions += 1
-                print(f"  {pos.get('symbol')}: Collateral=${collateral:.2f}, Unrealized=${unrealized:.2f}")
-            
-            total_collateral += collateral
-            total_unrealized_pnl += unrealized
-            total_realized_pnl += realized
-        
-        total_balance = total_collateral + total_unrealized_pnl + total_realized_pnl
-        total_pnl = total_unrealized_pnl + total_realized_pnl
-        pnl_percentage = (total_pnl / total_balance * 100) if total_balance > 0 else 0
-        
-        print(f"✓ Calculated from {len(positions)} positions ({active_positions} active):")
-        print(f"  Total Collateral: ${total_collateral:.2f}")
-        print(f"  Unrealized P&L: ${total_unrealized_pnl:.2f}")
-        print(f"  Realized P&L: ${total_realized_pnl:.2f}")
-        print(f"  Estimated Balance: ${total_balance:.2f}")
-        print(f"  Total P&L: ${total_pnl:.2f} ({pnl_percentage:.2f}%)")
-        
-        return {
-            'total': total_balance,
-            'free': total_collateral,
-            'used': total_unrealized_pnl,
-            'unrealized_pnl': total_unrealized_pnl,
-            'realized_pnl': total_realized_pnl,
-            'total_pnl': total_pnl,
-            'pnl_percentage': pnl_percentage,
-            'status': 'OK'
-        }
-        
-    except Exception as e:
-        print(f"❌ Error calculating balance: {e}")
-        return {
-            'total': 0,
-            'free': 0,
-            'used': 0,
-            'unrealized_pnl': 0,
-            'realized_pnl': 0,
-            'total_pnl': 0,
-            'pnl_percentage': 0,
-            'status': f'Error: {str(e)}'
-        }
-
-
 def get_account_balance(api_key, api_secret):
-    """Get account balance - PRIMARY METHOD"""
+    """Get account balance and calculate P&L - FIXED FOR BINGX"""
     try:
         print("Fetching account balance...")
         
@@ -183,44 +88,74 @@ def get_account_balance(api_key, api_secret):
             }
         })
         
-        # Try primary method
-        try:
-            account = client.fetch_balance()
-            total_balance = safe_float(account.get('total', 0))
-            free_balance = safe_float(account.get('free', 0))
-            used_balance = safe_float(account.get('used', 0))
-            
-            print(f"✓ fetch_balance() returned:")
-            print(f"  Total: ${total_balance:.2f}")
-            
-            # If we got a real balance, use it
-            if total_balance > 0:
-                # Calculate P&L from positions
-                positions = client.fetch_positions()
-                total_unrealized = sum(safe_float(p.get('unrealizedPnl', 0)) for p in positions)
-                total_realized = sum(safe_float(p.get('realizedPnl', 0)) for p in positions)
-                total_pnl = total_unrealized + total_realized
-                pnl_percentage = (total_pnl / total_balance * 100) if total_balance > 0 else 0
-                
-                return {
-                    'total': total_balance,
-                    'free': free_balance,
-                    'used': used_balance,
-                    'unrealized_pnl': total_unrealized,
-                    'realized_pnl': total_realized,
-                    'total_pnl': total_pnl,
-                    'pnl_percentage': pnl_percentage,
-                    'status': 'OK'
-                }
-        except Exception as e:
-            print(f"⚠️  Primary method failed: {e}")
+        # Get balance - BingX returns a dict with currency keys
+        balance = client.fetch_balance()
         
-        # Fallback: Calculate from positions
-        print("Falling back to position-based calculation...")
-        return get_account_balance_from_positions(api_key, api_secret)
+        # Extract USDT balance (main trading currency)
+        usdt_balance = balance.get('USDT', {})
+        total_balance = safe_float(usdt_balance.get('total', 0))
+        free_balance = safe_float(usdt_balance.get('free', 0))
+        used_balance = safe_float(usdt_balance.get('used', 0))
+        
+        print(f"✓ Balance fetched:")
+        print(f"  Total USDT: ${total_balance:.2f}")
+        print(f"  Free USDT: ${free_balance:.2f}")
+        print(f"  Used USDT: ${used_balance:.2f}")
+        
+        # Get positions for P&L calculation
+        positions = client.fetch_positions()
+        
+        total_unrealized_pnl = 0
+        total_realized_pnl = 0
+        active_positions = 0
+        
+        for pos in positions:
+            contracts = safe_float(pos.get('contracts', 0))
+            unrealized = safe_float(pos.get('unrealizedPnl', 0))
+            
+            # Look for realized P&L in info
+            info = pos.get('info', {})
+            realized = 0
+            
+            # Try different keys for realized P&L
+            if 'realisedProfit' in info:
+                realized = safe_float(info['realisedProfit'], 0)
+            elif 'realizedPnl' in info:
+                realized = safe_float(info['realizedPnl'], 0)
+            
+            total_unrealized_pnl += unrealized
+            total_realized_pnl += realized
+            
+            if contracts > 0:
+                active_positions += 1
+                print(f"  Position: {pos.get('symbol')} - Unrealized: ${unrealized:.4f}, Realized: ${realized:.4f}")
+        
+        total_pnl = total_unrealized_pnl + total_realized_pnl
+        pnl_percentage = (total_pnl / total_balance * 100) if total_balance > 0 else 0
+        
+        print(f"✓ P&L calculated:")
+        print(f"  Unrealized: ${total_unrealized_pnl:.4f}")
+        print(f"  Realized: ${total_realized_pnl:.4f}")
+        print(f"  Total P&L: ${total_pnl:.4f}")
+        print(f"  P&L %: {pnl_percentage:.2f}%")
+        print(f"  Active Positions: {active_positions}")
+        
+        return {
+            'total': total_balance,
+            'free': free_balance,
+            'used': used_balance,
+            'unrealized_pnl': total_unrealized_pnl,
+            'realized_pnl': total_realized_pnl,
+            'total_pnl': total_pnl,
+            'pnl_percentage': pnl_percentage,
+            'active_positions': active_positions,
+            'status': 'OK'
+        }
         
     except Exception as e:
         print(f"❌ Error fetching account balance: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             'total': 0,
             'free': 0,
@@ -229,6 +164,7 @@ def get_account_balance(api_key, api_secret):
             'realized_pnl': 0,
             'total_pnl': 0,
             'pnl_percentage': 0,
+            'active_positions': 0,
             'status': f'Error: {str(e)}'
         }
 
@@ -255,25 +191,6 @@ def get_positions(api_key, api_secret):
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
-
-
-def load_perplexity_api_key():
-    """Load Perplexity API key from environment or file"""
-    api_key = os.getenv('PERPLEXITY_API_KEY')
-    
-    if api_key:
-        print("✓ Perplexity API key loaded from environment")
-        return api_key
-    
-    try:
-        with open("perplexity_key.json", "r") as f:
-            data = json.load(f)
-        if "api_key" not in data:
-            raise Exception("JSON file must contain 'api_key'")
-        print("✓ Perplexity API key loaded from file")
-        return data["api_key"]
-    except FileNotFoundError:
-        raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
 def load_google_credentials():
@@ -334,11 +251,13 @@ def write_portfolio_summary_to_sheet(service, sheet_id, balance_info, timestamp)
             ["Free Balance:", f"${safe_round(balance_info['free'], 2):.2f}"],
             ["Used Balance:", f"${safe_round(balance_info['used'], 2):.2f}"],
             ["", ""],
-            ["P&L (Total):", f"${safe_round(balance_info['total_pnl'], 2):.2f}"],
+            ["P&L (Total):", f"${safe_round(balance_info['total_pnl'], 4):.4f}"],
             ["P&L %:", f"{safe_round(balance_info['pnl_percentage'], 2):.2f}%"],
             ["", ""],
-            ["Unrealized P&L:", f"${safe_round(balance_info['unrealized_pnl'], 2):.2f}"],
-            ["Realized P&L:", f"${safe_round(balance_info['realized_pnl'], 2):.2f}"],
+            ["Unrealized P&L:", f"${safe_round(balance_info['unrealized_pnl'], 4):.4f}"],
+            ["Realized P&L:", f"${safe_round(balance_info['realized_pnl'], 4):.4f}"],
+            ["", ""],
+            ["Active Positions:", balance_info['active_positions']],
             ["", ""],
             ["Status", balance_info['pnl_percentage'] >= 0 and "PROFIT ✓" or "LOSS ✗"]
         ]
@@ -362,10 +281,79 @@ def write_portfolio_summary_to_sheet(service, sheet_id, balance_info, timestamp)
         print(f"❌ Error writing portfolio summary: {e}")
 
 
+def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
+    """Write ALL positions to Google Sheets"""
+    try:
+        sheet_name = "All Positions"
+        ensure_sheet_exists(service, sheet_id, sheet_name)
+        
+        headers = [
+            "Timestamp", "Symbol", "Side", "Status", "Entry Price", "Mark Price", 
+            "Contracts", "Collateral", "Unrealized P&L", "Realized P&L", 
+            "Leverage", "Liquidation Price", "Margin Ratio"
+        ]
+        
+        rows = [headers]
+        
+        if not positions:
+            rows.append([timestamp, "NO POSITIONS", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"])
+            print(f"✅ No positions - recorded in sheet")
+        else:
+            for pos in positions:
+                contracts = safe_float(pos.get('contracts', 0))
+                status = "ACTIVE" if contracts > 0 else "CLOSED"
+                
+                unrealized = safe_float(pos.get('unrealizedPnl', 0))
+                entry_price = safe_float(pos.get('entryPrice', 0))
+                mark_price = safe_float(pos.get('markPrice', 0))
+                liquidation_price = safe_float(pos.get('liquidationPrice', 0))
+                collateral = safe_float(pos.get('collateral', 0))
+                margin_ratio = safe_float(pos.get('marginRatio', 0))
+                
+                # Get realized P&L from info
+                info = pos.get('info', {})
+                realized = 0
+                if 'realisedProfit' in info:
+                    realized = safe_float(info['realisedProfit'], 0)
+                
+                rows.append([
+                    timestamp,
+                    pos.get('symbol', ''),
+                    pos.get('side', ''),
+                    status,
+                    safe_round(entry_price, 2),
+                    safe_round(mark_price, 2),
+                    safe_round(contracts, 4),
+                    safe_round(collateral, 2),
+                    safe_round(unrealized, 4),
+                    safe_round(realized, 4),
+                    pos.get('leverage', ''),
+                    safe_round(liquidation_price, 2),
+                    safe_round(margin_ratio, 4)
+                ])
+        
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:M2000'
+        ).execute()
+        
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1',
+            valueInputOption='RAW',
+            body={'values': rows}
+        ).execute()
+        
+        print(f"✅ Updated 'All Positions' sheet with {len(rows)-1} positions")
+        
+    except Exception as e:
+        print(f"❌ Error writing positions: {e}")
+
+
 if __name__ == "__main__":
     try:
         print("=" * 100)
-        print("BingX Portfolio Tracker - FIXED VERSION")
+        print("BingX Portfolio Tracker - CORRECTED VERSION")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 100)
         print()
@@ -376,23 +364,25 @@ if __name__ == "__main__":
         # Load API keys
         api_key, api_secret = load_api_keys()
         
-        # Run diagnostic
-        print("\n📋 Running diagnostics...")
-        diagnose_account(api_key, api_secret)
-        
         # Get positions
+        print("\n📊 Step 1: Fetching Positions")
+        print("-" * 100)
         positions = get_positions(api_key, api_secret)
         
-        # Get account balance (with fallback)
+        # Get account balance (NOW FIXED)
+        print("\n💰 Step 2: Fetching Account Balance")
+        print("-" * 100)
         balance_info = get_account_balance(api_key, api_secret)
         
         print(f"\n✓ Final Balance Info:")
         print(f"  Total: ${balance_info['total']:.2f}")
-        print(f"  P&L: ${balance_info['total_pnl']:.2f}")
+        print(f"  P&L: ${balance_info['total_pnl']:.4f}")
         print(f"  P&L %: {balance_info['pnl_percentage']:.2f}%")
         print(f"  Status: {balance_info['status']}")
         
         # Setup Google Sheets
+        print("\n📝 Step 3: Writing to Google Sheets")
+        print("-" * 100)
         load_google_credentials()
         
         creds = Credentials.from_service_account_file(
@@ -409,10 +399,16 @@ if __name__ == "__main__":
         # Write portfolio
         write_portfolio_summary_to_sheet(service, SHEET_ID, balance_info, timestamp)
         
+        # Write positions
+        write_all_positions_to_sheet(service, SHEET_ID, positions, timestamp)
+        
         print()
         print("=" * 100)
         print("✅ Portfolio tracker completed successfully!")
         print("=" * 100)
+        print("\n📊 Google Sheets updated:")
+        print("   - '📈 Portfolio' sheet (Balance, P&L, P&L %)")
+        print("   - 'All Positions' sheet (position details)")
         
     except Exception as e:
         print(f"❌ Fatal error: {e}")
