@@ -257,8 +257,8 @@ def generate_market_research_prompt():
     prompt = f"""MARKET RESEARCH AND TRADING SIGNALS TASK:
     Time generated: {current_time}
 
-    Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
-    - Use REAL-TIME current prices and data on [https://coinmarketcap.com/](https://coinmarketcap.com/)
+    Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Ethereum (ETH), Solana (SOL), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
+    - Use REAL-TIME current prices and data on [https://coinmarketcap.com/]
     1. **CURRENT PRICE & SENTIMENT TABLE:**
     | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
@@ -297,6 +297,7 @@ def generate_market_research_prompt():
     - Cite news sources for catalysts
     - Use section headers (##) for organization
     - Be specific about timeframes for trades
+    - Make it as a text
 - Include confidence levels and risk assessments"""
     
     return prompt
