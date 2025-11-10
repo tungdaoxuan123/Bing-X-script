@@ -15,24 +15,25 @@ from bingx.ccxt import bingx as BingxSync
 
 
 def load_api_keys():
-    """Load API keys from api_key.json file"""
+    """Load API keys from environment variables"""
     try:
-        if not os.path.exists("api_key.json"):
-            print("❌ api_key.json not found!")
+        api_key = os.getenv('BINGX_API_KEY')
+        api_secret = os.getenv('BINGX_API_SECRET')
+        
+        if not api_key or not api_secret:
+            print("❌ BINGX_API_KEY or BINGX_API_SECRET environment variables not set!")
+            print("\nSet them with:")
+            print("  Windows: set BINGX_API_KEY=your_key")
+            print("           set BINGX_API_SECRET=your_secret")
+            print("  Linux/Mac: export BINGX_API_KEY=your_key")
+            print("             export BINGX_API_SECRET=your_secret")
             sys.exit(1)
         
-        with open("api_key.json", "r") as f:
-            data = json.load(f)
+        print("✓ API keys loaded from environment variables")
+        print(f"  - BINGX_API_KEY: {api_key[:10]}...{api_key[-5:]}")
+        print(f"  - BINGX_API_SECRET: {api_secret[:10]}...{api_secret[-5:]}")
         
-        api_key = data.get("api-key")
-        secret_key = data.get("secret-key")
-        
-        if not api_key or not secret_key:
-            print("❌ api_key.json missing 'api-key' or 'secret-key'")
-            sys.exit(1)
-        
-        print("✓ API keys loaded from api_key.json")
-        return api_key, secret_key
+        return api_key, api_secret
         
     except Exception as e:
         print(f"❌ Error loading API keys: {e}")
@@ -353,7 +354,7 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
 if __name__ == "__main__":
     try:
         print("=" * 100)
-        print("BingX Portfolio Tracker - CORRECTED VERSION")
+        print("BingX Portfolio Tracker - Environment Variables Version")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 100)
         print()
@@ -361,7 +362,7 @@ if __name__ == "__main__":
         # Get Sheet ID from environment or use default
         SHEET_ID = os.getenv('GOOGLE_SHEET_ID', '1NADCWY48TpJU4jBrw0Bow1TEGxHBBwsTxwEstHDQPyU')
         
-        # Load API keys
+        # Load API keys from environment
         api_key, api_secret = load_api_keys()
         
         # Get positions
