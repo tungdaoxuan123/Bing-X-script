@@ -6,11 +6,14 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 import requests
 
+
 # Map ccxt module
 import bingx.ccxt as ccxt_module
 sys.modules['ccxt'] = ccxt_module
 
+
 from bingx.ccxt import bingx as BingxSync
+
 
 
 def load_api_keys():
@@ -33,6 +36,7 @@ def load_api_keys():
         raise Exception("API keys not found in environment or api_key.json")
 
 
+
 def load_perplexity_api_key():
     """Load Perplexity API key from environment or file"""
     api_key = os.getenv('PERPLEXITY_API_KEY')
@@ -52,6 +56,7 @@ def load_perplexity_api_key():
         raise Exception("Perplexity API key not found in environment or perplexity_key.json")
 
 
+
 def safe_float(value, default=0.0):
     """Safely convert value to float with default fallback"""
     if value is None:
@@ -62,10 +67,12 @@ def safe_float(value, default=0.0):
         return default
 
 
+
 def safe_round(value, decimals=8, default=0.0):
     """Safely round a value"""
     num = safe_float(value, default)
     return round(num, decimals)
+
 
 
 def get_positions(api_key, api_secret):
@@ -90,6 +97,69 @@ def get_positions(api_key, api_secret):
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return []
+
+
+
+def get_account_balance(api_key, api_secret):
+    """Get account balance and calculate P&L"""
+    try:
+        print("Fetching account balance...")
+        
+        client = BingxSync({
+            'apiKey': api_key,
+            'secret': api_secret,
+            'enableRateLimit': True,
+            'options': {
+                'defaultType': 'swap'
+            }
+        })
+        
+        # Fetch account info
+        account = client.fetch_balance()
+        
+        # Get total balance
+        total_balance = safe_float(account.get('total', 0))
+        free_balance = safe_float(account.get('free', 0))
+        used_balance = safe_float(account.get('used', 0))
+        
+        # Calculate P&L from positions
+        positions = client.fetch_positions()
+        total_unrealized_pnl = 0
+        total_realized_pnl = 0
+        
+        for pos in positions:
+            total_unrealized_pnl += safe_float(pos.get('unrealizedPnl', 0))
+            total_realized_pnl += safe_float(pos.get('realizedPnl', 0))
+        
+        total_pnl = total_unrealized_pnl + total_realized_pnl
+        pnl_percentage = (total_pnl / total_balance * 100) if total_balance > 0 else 0
+        
+        balance_info = {
+            'total': total_balance,
+            'free': free_balance,
+            'used': used_balance,
+            'unrealized_pnl': total_unrealized_pnl,
+            'realized_pnl': total_realized_pnl,
+            'total_pnl': total_pnl,
+            'pnl_percentage': pnl_percentage
+        }
+        
+        print(f"✓ Account balance fetched: ${total_balance:.2f}")
+        print(f"  - P&L: ${total_pnl:.2f} ({pnl_percentage:.2f}%)")
+        
+        return balance_info
+    except Exception as e:
+        print(f"⚠️  Error fetching account balance: {e}")
+        return {
+            'total': 0,
+            'free': 0,
+            'used': 0,
+            'unrealized_pnl': 0,
+            'realized_pnl': 0,
+            'total_pnl': 0,
+            'pnl_percentage': 0
+        }
+
 
 
 def get_all_position_fields(position):
@@ -141,6 +211,7 @@ def get_all_position_fields(position):
     return fields
 
 
+
 def print_all_positions_detailed(positions):
     """Print detailed information for ALL positions"""
     if not positions:
@@ -167,6 +238,7 @@ def print_all_positions_detailed(positions):
                 for field_name, value in fields_dict.items():
                     if value is not None:
                         print(f"    {field_name}: {value}")
+
 
 
 def format_all_positions_for_analysis(positions):
@@ -197,6 +269,7 @@ def format_all_positions_for_analysis(positions):
 - Margin Ratio: {pos.get('marginRatio')}
 
 
+
 """
     
     if inactive:
@@ -206,6 +279,7 @@ def format_all_positions_for_analysis(positions):
             summary += f"- **{pos.get('symbol')}**: Realized P&L: ${realized:.2f}\n"
     
     return summary
+
 
 
 def generate_position_analysis_prompt(positions):
@@ -220,9 +294,12 @@ def generate_position_analysis_prompt(positions):
     
     prompt = f"""POSITION ANALYSIS TASK:
 
+
 {positions_summary}
 
+
 Analyze my current open positions and provide:
+
 
 1. **CURRENT POSITION STATUS TABLE:**
    | Symbol | Side | Entry | Mark | P&L $ | P&L % | Leverage | Liquidation | Margin Ratio | Status |
@@ -235,6 +312,7 @@ Analyze my current open positions and provide:
    - Take-profit targets
    - Time to exit recommendation (if any)
 
+
 3. **RISK ASSESSMENT:**
    - Overall portfolio leverage
    - Funding rate impact per position
@@ -242,12 +320,16 @@ Analyze my current open positions and provide:
    - Liquidation risk analysis
    - Margin requirements vs available margin
 
+
 4. **ACTION ITEMS:**
    | Symbol | Action | Target Price | Reason | Priority |
 
+
 Format as structured tables with specific numbers. Be precise and actionable."""
 
+
     return prompt
+
 
 
 def generate_market_research_prompt():
@@ -257,13 +339,16 @@ def generate_market_research_prompt():
     prompt = f"""MARKET RESEARCH AND TRADING SIGNALS TASK:
     Time generated: {current_time}
 
+
     Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Ethereum (ETH), Solana (SOL), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
     - Use REAL-TIME current prices and data on [https://coinmarketcap.com/]
     1. **CURRENT PRICE & SENTIMENT TABLE:**
     | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
+
     2. **TECHNICAL ANALYSIS TABLE:**
     | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
+
 
     3. **FUNDAMENTAL CATALYSTS:**
     For each asset:
@@ -272,8 +357,10 @@ def generate_market_research_prompt():
     - Regulatory updates
     - Market sentiment indicators
 
+
     4. **TRADING OPPORTUNITIES TABLE:**
     | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
+
 
     5. **SHORT-TERM TRADING SETUPS:**
     - Scalping opportunities (quick 1-5% gains)
@@ -281,14 +368,17 @@ def generate_market_research_prompt():
     - Momentum plays with catalysts
     - Volume spike analysis
 
+
     6. **EXECUTION PLAN:**
     | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
+
 
     7. **MARKET CORRELATIONS & RISKS:**
     - Asset correlations
     - Sector movements affecting each asset
     - Macro risks (interest rates, economic data)
     - Timing considerations for entries
+
 
     CRITICAL REQUIREMENTS:
     - Provide specific price levels (not ranges)
@@ -301,6 +391,7 @@ def generate_market_research_prompt():
 - Include confidence levels and risk assessments"""
     
     return prompt
+
 
 
 def load_google_credentials():
@@ -317,6 +408,7 @@ def load_google_credentials():
         raise Exception("Google credentials not found in environment or file")
     
     print("✓ Google credentials loaded from file")
+
 
 
 def ensure_sheet_exists(service, sheet_id, sheet_name):
@@ -343,6 +435,98 @@ def ensure_sheet_exists(service, sheet_id, sheet_name):
         return True
     except Exception as e:
         raise
+
+
+
+def write_portfolio_summary_to_sheet(service, sheet_id, balance_info, timestamp):
+    """Write portfolio summary to Google Sheets - NEW SHEET"""
+    try:
+        sheet_name = "📈 Portfolio"
+        ensure_sheet_exists(service, sheet_id, sheet_name)
+        
+        # Format portfolio data
+        rows = [
+            ["📈 Portfolio Summary"],
+            ["", ""],
+            ["Updated", timestamp],
+            ["", ""],
+            ["Balance:", f"${safe_round(balance_info['total'], 2):.2f}"],
+            ["Free Balance:", f"${safe_round(balance_info['free'], 2):.2f}"],
+            ["Used Balance:", f"${safe_round(balance_info['used'], 2):.2f}"],
+            ["", ""],
+            ["P&L (Total):", f"${safe_round(balance_info['total_pnl'], 2):.2f}"],
+            ["P&L %:", f"{safe_round(balance_info['pnl_percentage'], 2):.2f}%"],
+            ["", ""],
+            ["Unrealized P&L:", f"${safe_round(balance_info['unrealized_pnl'], 2):.2f}"],
+            ["Realized P&L:", f"${safe_round(balance_info['realized_pnl'], 2):.2f}"],
+            ["", ""],
+            ["Status", balance_info['pnl_percentage'] >= 0 and "PROFIT ✓" or "LOSS ✗"]
+        ]
+        
+        # Clear and update sheet
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1:Z500'
+        ).execute()
+        
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id,
+            range=f'{sheet_name}!A1',
+            valueInputOption='RAW',
+            body={'values': rows}
+        ).execute()
+        
+        # Apply formatting (make it look nice)
+        format_portfolio_sheet(service, sheet_id, sheet_name)
+        
+        print(f"✅ Updated '📈 Portfolio' sheet")
+        
+    except Exception as e:
+        print(f"❌ Error writing portfolio summary: {e}")
+        raise
+
+
+
+def format_portfolio_sheet(service, sheet_id, sheet_name):
+    """Format portfolio sheet with colors and fonts"""
+    try:
+        requests_list = [
+            {
+                'updateCells': {
+                    'range': {'sheetId': get_sheet_id(service, sheet_id, sheet_name), 'rowIndex': 0},
+                    'rows': [{
+                        'values': [{
+                            'userEnteredFormat': {
+                                'textFormat': {'bold': True, 'fontSize': 16},
+                                'backgroundColor': {'red': 0.2, 'green': 0.5, 'blue': 0.8}
+                            }
+                        }]
+                    }],
+                    'fields': 'userEnteredFormat'
+                }
+            }
+        ]
+        
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body={'requests': requests_list}
+        ).execute()
+    except Exception as e:
+        print(f"⚠️  Could not format portfolio sheet: {e}")
+
+
+
+def get_sheet_id(service, sheet_id, sheet_name):
+    """Get the numeric sheet ID from sheet name"""
+    try:
+        props = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        for sheet in props.get('sheets', []):
+            if sheet['properties']['title'] == sheet_name:
+                return sheet['properties']['sheetId']
+        return 0
+    except:
+        return 0
+
 
 
 def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
@@ -421,6 +605,7 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
         raise
 
 
+
 def format_analysis_for_csv(analysis_content):
     """Format analysis content into CSV-compatible rows"""
     try:
@@ -471,6 +656,7 @@ def format_analysis_for_csv(analysis_content):
         return [["Error parsing analysis"]]
 
 
+
 def write_to_analysis_sheet(service, sheet_id, sheet_name, analysis_content, timestamp):
     """Write analysis to Google Sheets in CSV-compatible format"""
     try:
@@ -512,6 +698,7 @@ def write_to_analysis_sheet(service, sheet_id, sheet_name, analysis_content, tim
     except Exception as e:
         print(f"❌ Error writing to {sheet_name}: {e}")
         raise
+
 
 
 def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
@@ -564,6 +751,7 @@ def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
         return None
 
 
+
 def send_to_perplexity_for_market_research(perplexity_api_key):
     """Send market research request to Perplexity"""
     try:
@@ -608,6 +796,7 @@ def send_to_perplexity_for_market_research(perplexity_api_key):
         return None
 
 
+
 if __name__ == "__main__":
     try:
         print("=" * 100)
@@ -626,6 +815,9 @@ if __name__ == "__main__":
         # Get all positions
         positions = get_positions(api_key, api_secret)
         
+        # Get account balance
+        balance_info = get_account_balance(api_key, api_secret)
+        
         # Print position details
         print_all_positions_detailed(positions)
         
@@ -643,6 +835,10 @@ if __name__ == "__main__":
         
         service = build('sheets', 'v4', credentials=creds)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # WRITE PORTFOLIO SUMMARY FIRST (NEW SHEET)
+        print("\n📊 Writing portfolio summary...")
+        write_portfolio_summary_to_sheet(service, SHEET_ID, balance_info, timestamp)
         
         # Write positions to sheet
         write_all_positions_to_sheet(service, SHEET_ID, positions, timestamp)
@@ -666,6 +862,7 @@ if __name__ == "__main__":
         print("✅ Tracker completed successfully - All data written to Google Sheets")
         print("=" * 100)
         print("\n📊 Google Sheets updated:")
+        print("   - '📈 Portfolio' sheet (balance, P&L, P&L %)")
         print("   - 'All Positions' sheet (current holdings)")
         if position_analysis:
             print("   - 'Position Analysis' sheet (hold/exit/add recommendations)")
