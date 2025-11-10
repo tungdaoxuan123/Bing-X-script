@@ -541,9 +541,8 @@ def send_to_perplexity_for_position_analysis(positions, perplexity_api_key):
             ],
             "temperature": 0.2,
             "top_p": 0.75,
-            "max_tokens": 8000,
+            "max_tokens": 10000,
             "search_recency_filter": "day",
-            "return_citations": true,
             "frequency_penalty": 0.1,
             "presence_penalty": 0.0
         }
