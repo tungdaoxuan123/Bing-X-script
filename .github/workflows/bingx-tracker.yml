@@ -3,7 +3,7 @@ name: BingX Portfolio Tracker with Perplexity Analysis (Every 60 min)
 
 on:
   schedule:
-    - cron: '*/60 * * * *'
+    - cron: '*/8 * * * *'
   push:
     branches:
       - main
