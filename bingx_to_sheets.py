@@ -352,43 +352,64 @@ def write_all_positions_to_sheet(service, sheet_id, positions, timestamp):
 
 
 def generate_market_research_prompt():
-    """Generate market research prompt for Perplexity"""
+    """Generate prompt for deep market research on assets with current time"""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    return f"""MARKET RESEARCH AND TRADING SIGNALS TASK:
-Time generated: {current_time}
+    prompt = f"""MARKET RESEARCH AND TRADING SIGNALS TASK:
+    Time generated: {current_time}
 
-Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Ethereum (ETH), Solana (SOL), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
 
-Use REAL-TIME current prices and data:
+    Analyze the current cryptocurrency and stock markets for Bitcoin (BTC), Ethereum (ETH), Solana (SOL), Amazon (AMZN), Google (GOOGL), and Tesla (TSLA).
+    - Use REAL-TIME current prices and data on [https://coinmarketcap.com/]
+    1. **CURRENT PRICE & SENTIMENT TABLE:**
+    | Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
-1. **CURRENT PRICE & SENTIMENT TABLE:**
-| Asset | Current Price | 24h Change % | Sentiment | Trend | Volume |
 
-2. **TECHNICAL ANALYSIS TABLE:**
-| Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
+    2. **TECHNICAL ANALYSIS TABLE:**
+    | Asset | RSI | MACD | Moving Avg | Support | Resistance | Signal |
 
-3. **TRADING OPPORTUNITIES TABLE:**
-| Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe |
 
-4. **SHORT-TERM TRADING SETUPS:**
-- Scalping opportunities (quick 1-5% gains)
-- Swing trade setups (5-15% gains)
-- Momentum plays with catalysts
+    3. **FUNDAMENTAL CATALYSTS:**
+    For each asset:
+    - Recent news and events
+    - Upcoming earnings or economic data
+    - Regulatory updates
+    - Market sentiment indicators
 
-5. **MARKET CORRELATIONS & RISKS:**
-- Asset correlations
-- Macro risks (interest rates, economic data)
-- Liquidation risk analysis
 
-CRITICAL REQUIREMENTS:
-- Provide specific price levels (not ranges)
-- Include all units ($, %, etc.)
-- Format tables with pipe separators | for easy import
-- Use section headers (##) for organization
-- Be specific about timeframes for trades
+    4. **TRADING OPPORTUNITIES TABLE:**
+    | Asset | Signal | Entry Price | Stop Loss | Take Profit | P&L Target % | R:R Ratio | Confidence % | Timeframe | Rationale |
+
+
+    5. **SHORT-TERM TRADING SETUPS:**
+    - Scalping opportunities (quick 1-5% gains)
+    - Swing trade setups (5-15% gains)
+    - Momentum plays with catalysts
+    - Volume spike analysis
+
+
+    6. **EXECUTION PLAN:**
+    | Asset | Action | Order Type | Price | Quantity | Risk/Reward | Notes |
+
+
+    7. **MARKET CORRELATIONS & RISKS:**
+    - Asset correlations
+    - Sector movements affecting each asset
+    - Macro risks (interest rates, economic data)
+    - Timing considerations for entries
+
+
+    CRITICAL REQUIREMENTS:
+    - Provide specific price levels (not ranges)
+    - Include all units ($, %, etc.)
+    - Format all data as copy-paste ready for Google Sheets
+    - Cite news sources for catalysts
+    - Use section headers (##) for organization
+    - Be specific about timeframes for trades
+    - Make it as a text
 - Include confidence levels and risk assessments"""
-
+    
+    return prompt
 
 def send_to_perplexity_market_research(perplexity_api_key):
     """Send market research request to Perplexity"""
